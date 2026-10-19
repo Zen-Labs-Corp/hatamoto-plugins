@@ -1,0 +1,9 @@
+{
+  "name": "extra-field",
+  "repo": "https://github.com/acme/x",
+  "commit": "0123456789abcdef0123456789abcdef01234567",
+  "author": "acme",
+  "license": "MIT",
+  "sdk": "^0.10",
+  "price": "free"
+}
