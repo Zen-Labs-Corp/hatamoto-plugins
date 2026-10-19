@@ -1,0 +1,8 @@
+{
+  "name": "bad-commit",
+  "repo": "https://github.com/acme/hatamoto-x",
+  "commit": "abc123",
+  "author": "acme",
+  "license": "MIT",
+  "sdk": "^0.10"
+}
