@@ -29,6 +29,7 @@ expect_reject bad-commit.json "commit must be 40"
 expect_reject bad-repo.json "repo must be https://github.com"
 expect_reject missing-sdk.json "missing required field: sdk"
 expect_reject extra-field.json "unknown field(s): price"
+expect_reject bad-title.json "title must be 1 to 60"
 
 # name must equal the file name.
 tmp=$(mktemp -d)
@@ -44,6 +45,14 @@ for r in gtm webhooks searchconsole hello; do
   if err=$("$v" "$tmp/$r.json" 2>&1 >/dev/null); then no "reserved name $r rejected"
   elif [[ $err == *"reserved for a first-party plugin"* ]]; then ok "reserved name $r rejected"
   else no "reserved name $r: $err"; fi
+done
+
+# title: a display name, 1 to 60 printable characters.
+jq '. + {"title": "Acme SEO Helper"}' "$f/good.json" > "$tmp/good.json"
+if "$v" "$tmp/good.json" >/dev/null 2>&1; then ok "accepts title"; else no "accepts title"; fi
+for case in '"title": ""' '"title": " padded"' '"title": "a\u0007b"' "\"title\": \"$(printf 'x%.0s' $(seq 61))\"" '"title": 5'; do
+  jq ". + {$case}" "$f/good.json" > "$tmp/good.json"
+  if "$v" "$tmp/good.json" >/dev/null 2>&1; then no "rejects $case"; else ok "rejects $case"; fi
 done
 
 # subdir traversal and homepage scheme.
