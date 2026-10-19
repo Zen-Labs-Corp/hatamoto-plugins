@@ -289,5 +289,5 @@ id you want reviewed, and follow [CONTRIBUTING.md](CONTRIBUTING.md).
 
 The directory card heads with your plugin's `name` (for example `acme-seo`). To show
 a friendlier heading such as "Acme SEO Helper", add the optional manifest field
-`"title"` (1 to 60 printable characters); the `name` and version stay on the line
+`"title"` (1 to 60 characters, no control characters, no leading or trailing space); the `name` and version stay on the line
 below it.

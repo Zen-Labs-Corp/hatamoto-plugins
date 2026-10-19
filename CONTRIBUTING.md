@@ -41,7 +41,7 @@ Add `manifests/<name>.json`, where `<name>` is the `name` in your `plugin.json`:
 | `repo` | yes | `https://github.com/<owner>/<repo>` |
 | `commit` | yes | full 40 character lowercase hex commit id |
 | `subdir` | no | plugin folder inside the repo; no `..`, no leading `/` |
-| `title` | no | display name for the directory card, 1 to 60 printable characters; without it the card shows `name` |
+| `title` | no | display name for the directory card, 1 to 60 characters, no control characters, no leading or trailing space; without it the card shows `name` |
 | `author` | yes | your GitHub name, shown as "by @author" |
 | `license` | yes | SPDX id, for example `MIT` or `Apache-2.0` |
 | `sdk` | yes | SDK range you built against; matches `plugin.json` |
