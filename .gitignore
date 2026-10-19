@@ -1,0 +1,4 @@
+build/
+*.key
+*.hmp
+.DS_Store
