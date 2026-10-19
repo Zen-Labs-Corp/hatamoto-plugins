@@ -23,6 +23,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Self-test the validator
         run: bash tests/run.sh
       - name: Validate changed manifests
@@ -31,11 +32,20 @@ jobs:
         run: |
           set -euo pipefail
           status=0
-          while IFS= read -r f; do
-            [ -f "$f" ] || continue
-            case "$f" in manifests/*.json) ;; *) continue ;; esac
+          while IFS= read -r -d '' f; do
+            case "$f" in
+              manifests/README.md | manifests/schema.json) continue ;;
+              manifests/*.json) ;;
+              manifests/*) echo "$f: only manifests/<name>.json files are allowed here" >&2; status=1; continue ;;
+              *) continue ;;
+            esac
+            base=${f#manifests/}; base=${base%.json}
+            if ! [[ $base =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
+              echo "$f: file name must be <name>.json with a valid plugin name" >&2
+              status=1; continue
+            fi
             scripts/validate-manifest.sh "$f" --remote || status=1
-          done < <(git diff --name-only "origin/$BASE_REF...HEAD" -- manifests)
+          done < <(git diff -z --name-only --diff-filter=AMR "origin/$BASE_REF...HEAD" -- manifests)
           exit "$status"
 
   build:
@@ -46,6 +56,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: '1.27.x'
@@ -55,9 +66,18 @@ jobs:
         run: |
           set -euo pipefail
           work=$(mktemp -d)
-          while IFS= read -r f; do
-            [ -f "$f" ] || continue
-            case "$f" in manifests/*.json) ;; *) continue ;; esac
+          while IFS= read -r -d '' f; do
+            case "$f" in
+              manifests/README.md | manifests/schema.json) continue ;;
+              manifests/*.json) ;;
+              manifests/*) echo "$f: only manifests/<name>.json files are allowed here" >&2; exit 1 ;;
+              *) continue ;;
+            esac
+            base=${f#manifests/}; base=${base%.json}
+            if ! [[ $base =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
+              echo "$f: file name must be <name>.json with a valid plugin name" >&2
+              exit 1
+            fi
             name=$(jq -r .name "$f")
             repo=$(jq -r .repo "$f")
             commit=$(jq -r .commit "$f")
@@ -82,4 +102,4 @@ jobs:
             fi
             cd "$GITHUB_WORKSPACE"
             echo "built $name"
-          done < <(git diff --name-only "origin/$BASE_REF...HEAD" -- manifests)
+          done < <(git diff -z --name-only --diff-filter=AMR "origin/$BASE_REF...HEAD" -- manifests)

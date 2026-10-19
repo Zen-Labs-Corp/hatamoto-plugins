@@ -58,6 +58,10 @@ homepage=$(field homepage)
 if has name && ! [[ $name =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
   bad "name must match ^[a-z][a-z0-9-]{1,39}\$"
 fi
+# First-party plugins; community manifests must not take these names.
+for reserved in gtm webhooks searchconsole hello; do
+  if [ "$name" = "$reserved" ]; then bad "name \"$name\" is reserved for a first-party plugin"; fi
+done
 base=$(basename "$file" .json)
 if has name && [ "$name" != "$base" ]; then
   bad "name \"$name\" must equal the file name \"$base\""

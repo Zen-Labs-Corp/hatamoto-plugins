@@ -38,6 +38,14 @@ if err=$("$v" "$tmp/other.json" 2>&1 >/dev/null); then no "name/file mismatch re
 elif [[ $err == *"must equal the file name"* ]]; then ok "name/file mismatch rejected"
 else no "name/file mismatch: $err"; fi
 
+# Reserved first-party names.
+for r in gtm webhooks searchconsole hello; do
+  jq --arg n "$r" '.name = $n' "$f/good.json" > "$tmp/$r.json"
+  if err=$("$v" "$tmp/$r.json" 2>&1 >/dev/null); then no "reserved name $r rejected"
+  elif [[ $err == *"reserved for a first-party plugin"* ]]; then ok "reserved name $r rejected"
+  else no "reserved name $r: $err"; fi
+done
+
 # subdir traversal and homepage scheme.
 for case in '"subdir": "../x"' '"subdir": "/abs"' '"homepage": "http://x.example"'; do
   jq ". + {$case}" "$f/good.json" > "$tmp/good.json"
