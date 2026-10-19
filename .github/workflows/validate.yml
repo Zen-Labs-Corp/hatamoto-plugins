@@ -34,7 +34,8 @@ jobs:
           status=0
           while IFS= read -r -d '' f; do
             case "$f" in
-              manifests/README.md | manifests/schema.json) continue ;;
+              manifests/README.md | manifests/schema.json | manifests/themes/README.md) continue ;;
+              manifests/themes/*.json) scripts/validate-theme-manifest.sh "$f" --remote || status=1; continue ;;
               manifests/*.json) ;;
               manifests/*) echo "$f: only manifests/<name>.json files are allowed here" >&2; status=1; continue ;;
               *) continue ;;
@@ -59,16 +60,20 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version: '1.27.x'
+          go-version: '1.27.2'
       - name: Build changed plugins at their pinned commits
         env:
           BASE_REF: ${{ github.base_ref }}
+          # The registry build uses this exact toolchain (core backend/go.mod) and never downloads another.
+          GOTOOLCHAIN: go1.27.2
+          GOWORK: 'off'
+          GOFLAGS: -mod=readonly
         run: |
           set -euo pipefail
           work=$(mktemp -d)
           while IFS= read -r -d '' f; do
             case "$f" in
-              manifests/README.md | manifests/schema.json) continue ;;
+              manifests/README.md | manifests/schema.json | manifests/themes/README.md | manifests/themes/*.json) continue ;;
               manifests/*.json) ;;
               manifests/*) echo "$f: only manifests/<name>.json files are allowed here" >&2; exit 1 ;;
               *) continue ;;
@@ -87,6 +92,7 @@ jobs:
             git -C "$src" init -q
             git -C "$src" fetch -q --depth 1 "$repo" "$commit"
             git -C "$src" checkout -q FETCH_HEAD
+            "$GITHUB_WORKSPACE/scripts/check-gomod.sh" "$src/$subdir" "$src"
             cd "$src/$subdir"
             mkdir -p build
             CGO_ENABLED=0 GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o build/plugin.wasm .
