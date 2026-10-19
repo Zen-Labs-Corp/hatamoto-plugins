@@ -286,3 +286,8 @@ To try the package on a development server, pick one:
 
 Push your code to GitHub, tag a release if you like, copy the 40 character commit
 id you want reviewed, and follow [CONTRIBUTING.md](CONTRIBUTING.md).
+
+The directory card heads with your plugin's `name` (for example `acme-seo`). To show
+a friendlier heading such as "Acme SEO Helper", add the optional manifest field
+`"title"` (1 to 60 printable characters); the `name` and version stay on the line
+below it.

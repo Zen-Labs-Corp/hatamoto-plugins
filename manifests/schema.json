@@ -9,6 +9,7 @@
     "repo": { "type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$" },
     "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "subdir": { "type": "string" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 60, "pattern": "^[^\\u0000-\\u001f\\u007f ]([^\\u0000-\\u001f\\u007f]*[^\\u0000-\\u001f\\u007f ])?$" },
     "author": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}$" },
     "license": { "type": "string", "minLength": 1 },
     "sdk": { "type": "string" },

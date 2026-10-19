@@ -33,14 +33,14 @@ field() { jq -r --arg k "$1" 'if (.[$k] | type) == "string" then .[$k] else "" e
 has() { jq -e --arg k "$1" 'has($k)' "$file" >/dev/null; }
 
 # Unknown keys.
-extra=$(jq -r '[keys[] | select(IN("name","repo","commit","subdir","author","license","sdk","homepage") | not)] | join(", ")' "$file")
+extra=$(jq -r '[keys[] | select(IN("name","repo","commit","subdir","title","author","license","sdk","homepage") | not)] | join(", ")' "$file")
 [ -z "$extra" ] || bad "unknown field(s): $extra"
 
 # Required keys, and every present key must be a string.
 for k in name repo commit author license sdk; do
   has "$k" || bad "missing required field: $k"
 done
-for k in name repo commit subdir author license sdk homepage; do
+for k in name repo commit subdir title author license sdk homepage; do
   if has "$k" && ! jq -e --arg k "$k" '.[$k] | type == "string"' "$file" >/dev/null; then
     bad "$k must be a string"
   fi
@@ -50,6 +50,7 @@ name=$(field name)
 repo=$(field repo)
 commit=$(field commit)
 subdir=$(field subdir)
+title=$(field title)
 author=$(field author)
 license=$(field license)
 sdk=$(field sdk)
@@ -75,6 +76,11 @@ fi
 if has subdir && [ -n "$subdir" ]; then
   if ! [[ $subdir =~ ^[A-Za-z0-9._/-]+$ ]] || [[ $subdir == /* ]] || [[ $subdir =~ (^|/)\.\.(/|$) ]]; then
     bad "subdir must use only A-Za-z0-9._/- with no leading / and no .."
+  fi
+fi
+if has title; then
+  if [ -z "$title" ] || [ "${#title}" -gt 60 ] || [[ $title =~ [[:cntrl:]] ]] || [[ $title =~ ^[[:space:]] ]] || [[ $title =~ [[:space:]]$ ]]; then
+    bad "title must be 1 to 60 printable characters without control characters or surrounding spaces"
   fi
 fi
 if has author && ! [[ $author =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,38}$ ]]; then

@@ -28,6 +28,7 @@ Add `manifests/<name>.json`, where `<name>` is the `name` in your `plugin.json`:
   "repo": "https://github.com/acme/hatamoto-acme-seo",
   "commit": "0123456789abcdef0123456789abcdef01234567",
   "subdir": "",
+  "title": "Acme SEO Helper",
   "author": "acme",
   "license": "MIT",
   "sdk": "^0.10"
@@ -40,6 +41,7 @@ Add `manifests/<name>.json`, where `<name>` is the `name` in your `plugin.json`:
 | `repo` | yes | `https://github.com/<owner>/<repo>` |
 | `commit` | yes | full 40 character lowercase hex commit id |
 | `subdir` | no | plugin folder inside the repo; no `..`, no leading `/` |
+| `title` | no | display name for the directory card, 1 to 60 printable characters; without it the card shows `name` |
 | `author` | yes | your GitHub name, shown as "by @author" |
 | `license` | yes | SPDX id, for example `MIT` or `Apache-2.0` |
 | `sdk` | yes | SDK range you built against; matches `plugin.json` |
