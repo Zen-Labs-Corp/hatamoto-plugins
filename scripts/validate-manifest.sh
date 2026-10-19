@@ -7,6 +7,8 @@
 # plugin.json at that commit carries the manifest name. Manifest values are only
 # ever passed as quoted arguments, never evaluated.
 set -euo pipefail
+# Count characters, not bytes, in the title check.
+export LC_ALL=C.UTF-8
 
 usage() { echo "usage: $0 <manifest.json> [--remote]" >&2; exit 2; }
 
@@ -79,8 +81,8 @@ if has subdir && [ -n "$subdir" ]; then
   fi
 fi
 if has title; then
-  if [ -z "$title" ] || [ "${#title}" -gt 60 ] || [[ $title =~ [[:cntrl:]] ]] || [[ $title =~ ^[[:space:]] ]] || [[ $title =~ [[:space:]]$ ]]; then
-    bad "title must be 1 to 60 printable characters without control characters or surrounding spaces"
+  if [ -z "$title" ] || [ "${#title}" -gt 60 ] || [[ $title =~ [[:cntrl:]] ]] || [[ $title == " "* ]] || [[ $title == *" " ]]; then
+    bad "title must be 1 to 60 characters, no control characters, no leading or trailing space"
   fi
 fi
 if has author && ! [[ $author =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,38}$ ]]; then

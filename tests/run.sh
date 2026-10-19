@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+export LC_ALL=C.UTF-8
 # Self-test for scripts/validate-manifest.sh (offline, no --remote).
 set -u
 cd "$(dirname "$0")/.."
@@ -47,10 +48,14 @@ for r in gtm webhooks searchconsole hello; do
   else no "reserved name $r: $err"; fi
 done
 
-# title: a display name, 1 to 60 printable characters.
+# title: a display name, 1 to 60 characters, no control characters, no leading or trailing space.
 jq '. + {"title": "Acme SEO Helper"}' "$f/good.json" > "$tmp/good.json"
 if "$v" "$tmp/good.json" >/dev/null 2>&1; then ok "accepts title"; else no "accepts title"; fi
-for case in '"title": ""' '"title": " padded"' '"title": "a\u0007b"' "\"title\": \"$(printf 'x%.0s' $(seq 61))\"" '"title": 5'; do
+for t in $'Dev\u00a0Tools' $'Code \U0001F468\u200d\U0001F4BB' "$(printf '\u65e5%.0s' $(seq 25))"; do
+  jq --arg t "$t" '. + {title: $t}' "$f/good.json" > "$tmp/good.json"
+  if "$v" "$tmp/good.json" >/dev/null 2>&1; then ok "accepts title $t"; else no "accepts title $t"; fi
+done
+for case in '"title": "a\tb"' '"title": "a "' '"title": ""' '"title": " padded"' '"title": "a\u0007b"' "\"title\": \"$(printf 'x%.0s' $(seq 61))\"" '"title": 5'; do
   jq ". + {$case}" "$f/good.json" > "$tmp/good.json"
   if "$v" "$tmp/good.json" >/dev/null 2>&1; then no "rejects $case"; else ok "rejects $case"; fi
 done
