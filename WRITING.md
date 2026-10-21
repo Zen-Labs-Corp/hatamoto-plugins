@@ -31,7 +31,7 @@ Your `go.mod` must resolve the SDK from the network. Do **not** add a `replace`
 line for `hatamoto.dev/sdk` (to any target), no local-path `replace` and no
 `go.work` file; the registry build runs in a clean checkout and refuses a plugin
 that has any of them. It also builds with the Hatamoto team's pinned Go toolchain
-(currently go1.27.2) and never downloads a newer one, so a plugin whose `go.mod`
+(currently go1.27.3) and never downloads a newer one, so a plugin whose `go.mod`
 requires a newer Go than that toolchain fails to build. After `go mod tidy` it
 looks like this:
 
