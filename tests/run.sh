@@ -132,7 +132,12 @@ if "$r" branch | jq -e '.name == "archive-main" and .target == "branch" and .enf
 if "$r" bogus >/dev/null 2>&1; then no "ruleset kind rejected"; else ok "ruleset kind rejected"; fi
 
 # scripts/mirror-plugin.sh: offline fixture mirrors.
-if bash tests/mirror.sh; then ok "mirror-plugin.sh tests"; else no "mirror-plugin.sh tests"; fi
+bash tests/mirror.sh
+case $? in
+  0) ok "mirror-plugin.sh tests" ;;
+  77) echo "SKIP mirror-plugin.sh tests (go not found, MIRROR_TESTS_ALLOW_SKIP=1)" ;;
+  *) no "mirror-plugin.sh tests" ;;
+esac
 
 echo "$pass passed, $failed failed"
 [ "$failed" -eq 0 ]
