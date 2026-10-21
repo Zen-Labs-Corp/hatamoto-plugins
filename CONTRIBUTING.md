@@ -13,10 +13,16 @@ one click from Admin > Plugins > Browse registry. To write one first, read
 1. You keep your plugin in your own public GitHub repo.
 2. You open a pull request here that adds one small manifest pinning a commit.
 3. CI checks the manifest. A maintainer reviews your code at that commit.
-4. A merge is the approval. The release manager builds the pinned commit,
-   signs it with the Hatamoto key and publishes it.
+4. A merge is the approval. CI copies the source at your pinned commit, with
+   its vendored Go dependencies, into a repo owned by the Hatamoto project:
+   a copy is kept at `github.com/<archive>/<name>` (the archive organization is
+   `hatamoto-plugins-archive`). The release manager builds from that copy, signs
+   the result with the Hatamoto key and publishes it.
 
-We never accept binaries. Everything is built from the source you pinned.
+We never accept binaries. Everything is built from the source you pinned. By
+submitting you grant the project the right to keep that copy and its signed
+builds and to redistribute them, even if you later delete or change your repo
+(see the checklist in the pull request template).
 
 ## The manifest
 
@@ -31,6 +37,7 @@ Add `manifests/<name>.json`, where `<name>` is the `name` in your `plugin.json`:
   "title": "Acme SEO Helper",
   "author": "acme",
   "license": "MIT",
+  "archive_grant": true,
   "sdk": "^0.10"
 }
 ```
@@ -43,7 +50,8 @@ Add `manifests/<name>.json`, where `<name>` is the `name` in your `plugin.json`:
 | `subdir` | no | plugin folder inside the repo; no `..`, no leading `/` |
 | `title` | no | display name for the directory card, 1 to 60 characters, no control characters, no leading or trailing space; without it the card shows `name` |
 | `author` | yes | your GitHub name, shown as "by @author" |
-| `license` | yes | SPDX id, for example `MIT` or `Apache-2.0` |
+| `license` | yes | SPDX id from the allowlist: `MIT`, `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `ISC`, `MPL-2.0`, `GPL-2.0`, `GPL-3.0`, `LGPL-2.1`, `LGPL-3.0`, `AGPL-3.0` (GPL, LGPL and AGPL also as `-only` or `-or-later`) |
+| `archive_grant` | yes | must be `true`: your perpetual, irrevocable grant to archive, build, sign and redistribute the source at the pinned commit and its builds |
 | `sdk` | yes | SDK range you built against; matches `plugin.json` |
 | `homepage` | no | an `https://` link |
 
@@ -84,7 +92,7 @@ A maintainer reads the source at the pinned commit. We look for:
   URLs the owner configures (and then say so in the PR).
 - **Readable code.** No obfuscated, minified or encoded blobs, no hidden
   behaviour, no data sent anywhere the description does not mention.
-- **License.** The repo has a license file, and it matches the manifest.
+- **License and grant.** The repo has a license file, it matches the manifest and is on the allowlist, and both PR checkboxes (the archive grant and the license) are ticked.
 - **Fit.** The plugin works, has tests, and does not duplicate a first-party
   plugin without good reason.
 
@@ -93,8 +101,10 @@ the PR.
 
 ## After the merge
 
-The release manager builds your plugin from the pinned commit, signs it with the
-Hatamoto key and publishes a new registry index. It then shows up in Browse
+CI mirrors your pinned commit (plus vendored dependencies) to
+`github.com/<archive>/<name>`. The release manager builds your plugin from that
+copy, signs it with the Hatamoto key, keeps every signed build, and publishes a
+new registry index. It then shows up in Browse
 registry on every Hatamoto server and as a card on
 <https://hatamoto.dev/plugins>, labelled "Community" and "by @author". Publishing
 is done by a person with the signing key, so it can lag the merge by a little.
@@ -109,6 +119,7 @@ changes since the previous commit.
 ## Removing a plugin
 
 Open a PR that deletes your manifest. After it merges the release manager
-publishes an index without the plugin. Copies already installed keep working until
+publishes an index without the plugin. The archived source and signed builds are
+not deleted (that is what the grant covers). Copies already installed keep working until
 each site owner removes them. If a plugin is found to be harmful, maintainers may
 remove its manifest without notice and publish immediately.
