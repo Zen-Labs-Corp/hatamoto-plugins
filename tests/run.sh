@@ -103,6 +103,24 @@ else
   echo "skip gomod tests: go not found"
 fi
 
+# scripts/changed-manifests.sh: selection of manifests to mirror, renames included.
+repo=$PWD
+cm() { (cd "$tmp/cm" && "$repo/scripts/changed-manifests.sh" "$@" | tr '\0' ' '); }
+cg() { git -C "$tmp/cm" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false "$@"; }
+git init -q "$tmp/cm"; mkdir -p "$tmp/cm/manifests/themes" "$tmp/cm/manifests/sub"
+for n in acme-seo keep gone; do jq --arg n "$n" '.name = $n' "$f/good.json" >"$tmp/cm/manifests/$n.json"; done
+for p in schema.json themes/t.json sub/x.json; do echo '{}' >"$tmp/cm/manifests/$p"; done
+cg add -A; cg commit -qm one
+cg mv manifests/acme-seo.json manifests/acme-seo-pro.json
+jq '.name = "acme-seo-pro"' "$tmp/cm/manifests/acme-seo-pro.json" >"$tmp/x" && mv "$tmp/x" "$tmp/cm/manifests/acme-seo-pro.json"
+cg rm -q manifests/gone.json
+echo '{"a":1}' >"$tmp/cm/manifests/schema.json"; echo '{"a":1}' >"$tmp/cm/manifests/themes/t.json"
+jq '.title = "Changed"' "$tmp/cm/manifests/keep.json" >"$tmp/x" && mv "$tmp/x" "$tmp/cm/manifests/keep.json"
+cg add -A; cg commit -qm two
+want="manifests/acme-seo-pro.json manifests/keep.json "
+if [ "$(cm HEAD~1 HEAD)" = "$want" ]; then ok "changed manifests: rename mirrored, delete/schema/themes skipped"; else no "changed manifests: $(cm HEAD~1 HEAD)"; fi
+if [ "$(cm)" = "$want" ]; then ok "all manifests: schema, themes, nested skipped"; else no "all manifests: $(cm)"; fi
+
 # scripts/mirror-rulesets.sh: payloads of the repository rulesets.
 r=scripts/mirror-rulesets.sh
 if "$r" tag | jq -e '.name == "archive-tags" and .target == "tag" and .enforcement == "active"
