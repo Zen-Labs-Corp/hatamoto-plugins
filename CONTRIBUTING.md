@@ -13,9 +13,9 @@ one click from Admin > Plugins > Browse registry. To write one first, read
 1. You keep your plugin in your own public GitHub repo.
 2. You open a pull request here that adds one small manifest pinning a commit.
 3. CI checks the manifest. A maintainer reviews your code at that commit.
-4. A merge is the approval. CI copies the source at your pinned commit, with
-   its vendored Go dependencies, into a repo owned by the Hatamoto project:
-   a copy is kept at `github.com/<archive>/<name>` (the archive organization is
+4. A merge is the approval. CI copies the source at your pinned commit into a
+   repo owned by the Hatamoto project (vendored Go dependencies are added only when
+   the SDK is public; the source copy is what matters): a copy is kept at `github.com/<archive>/<name>` (the archive organization is
    `hatamoto-plugins-archive`). The release manager builds from that copy, signs
    the result with the Hatamoto key and publishes it.
 
@@ -101,10 +101,16 @@ the PR.
 
 ## After the merge
 
-CI mirrors your pinned commit (plus vendored dependencies) to
+CI mirrors your pinned commit to
 `github.com/<archive>/<name>`. The release manager builds your plugin from that
 copy, signs it with the Hatamoto key, keeps every signed build, and publishes a
-new registry index. It then shows up in Browse
+new registry index.
+
+The mirror adds `vendor/` only as a last resort, and only while the maintainers
+have `SDK_PUBLIC=true`. A mirror made before that is not re-vendored later: the
+source copy at your commit is the archive, and the build can fetch dependencies
+itself. Re-running the mirror is safe: an existing `src/<commit>` is verified and
+kept, and the upstream repo is not needed for it. It then shows up in Browse
 registry on every Hatamoto server and as a card on
 <https://hatamoto.dev/plugins>, labelled "Community" and "by @author". Publishing
 is done by a person with the signing key, so it can lag the merge by a little.

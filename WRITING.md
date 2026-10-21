@@ -299,4 +299,4 @@ below it.
 Every manifest also needs `"archive_grant": true` (your grant to archive, build,
 sign and redistribute the source at the pinned commit) and a `license` from the
 allowlist in [CONTRIBUTING.md](CONTRIBUTING.md). After the merge a copy of your
-source is kept at `github.com/<archive>/<name>`.
+source at the pinned commit is kept at `github.com/<archive>/<name>`.
