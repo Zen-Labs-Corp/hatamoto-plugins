@@ -128,5 +128,104 @@ else
   no "vendoring run: $out"
 fi
 
+# --- re-run after the upstream is deleted, and completing missing refs ----
+upstream "$tmp/up/kappa" kappa 1.0.0
+ksha=$(git -C "$tmp/up/kappa" rev-parse HEAD)
+manifest kappa "$tmp/up/kappa" "$ksha"
+"$m" "$tmp/manifests/kappa.json" >/dev/null 2>&1
+km=$tmp/mirrors/kappa
+rm -rf "$tmp/up/kappa"
+kbefore=$(git -C "$km" for-each-ref --format='%(refname) %(objectname)')
+if "$m" "$tmp/manifests/kappa.json" >/dev/null 2>&1; then ok "re-run succeeds from the mirror after the upstream is deleted"; else no "re-run after upstream deleted"; fi
+[ "$kbefore" = "$(git -C "$km" for-each-ref --format='%(refname) %(objectname)')" ] && ok "no ref changed on that re-run" || no "refs changed after upstream deleted"
+ktop=$(git -C "$km" rev-parse "src/$ksha^{commit}")
+git -C "$km" tag -d v1.0.0 >/dev/null
+git -C "$km" update-ref -d refs/heads/main
+srctag=$(git -C "$km" rev-parse "src/$ksha")
+if "$m" "$tmp/manifests/kappa.json" >/dev/null 2>&1 \
+  && [ "$(git -C "$km" rev-parse v1.0.0^{commit})" = "$ktop" ] && [ "$(git -C "$km" rev-parse main)" = "$ktop" ]; then
+  ok "missing v<version> and main are restored from the mirror"; else no "missing refs restored"; fi
+[ "$srctag" = "$(git -C "$km" rev-parse "src/$ksha")" ] && ok "src tag untouched while completing refs" || no "src tag moved"
+
+# --- an existing main is never moved --------------------------------------
+upstream "$tmp/up/lambda" lambda 1.0.0
+lsha=$(git -C "$tmp/up/lambda" rev-parse HEAD)
+manifest lambda "$tmp/up/lambda" "$lsha"
+git init -q --bare "$tmp/mirrors/lambda"
+git clone -q "$tmp/up/lambda" "$tmp/lseed"
+echo x >"$tmp/lseed/other.txt"; gi -C "$tmp/lseed" add -A; gi -C "$tmp/lseed" commit -qm unrelated
+git -C "$tmp/lseed" push -q "$tmp/mirrors/lambda" HEAD:refs/heads/main
+lmain=$(git -C "$tmp/mirrors/lambda" rev-parse main)
+if "$m" "$tmp/manifests/lambda.json" >/dev/null 2>&1 && [ "$(git -C "$tmp/mirrors/lambda" rev-parse main)" = "$lmain" ] \
+  && git -C "$tmp/mirrors/lambda" rev-parse -q --verify "refs/tags/src/$lsha" >/dev/null; then
+  ok "existing main kept, src tag added"; else no "existing main must not move"; fi
+
+# --- tampered existing src/<commit>: wrong parent -------------------------
+upstream "$tmp/up/mu" mu 1.0.0
+musha=$(git -C "$tmp/up/mu" rev-parse HEAD)
+manifest mu "$tmp/up/mu" "$musha"
+git init -q "$tmp/museed"
+echo '{"name":"mu"}' >"$tmp/museed/MIRROR.json"; gi -C "$tmp/museed" add -A; gi -C "$tmp/museed" commit -qm orphan
+gi -C "$tmp/museed" tag -a -m t "src/$musha"
+git init -q --bare "$tmp/mirrors/mu"
+git -C "$tmp/museed" push -q "$tmp/mirrors/mu" "refs/tags/src/$musha"
+if err=$("$m" "$tmp/manifests/mu.json" 2>&1); then no "wrong-parent src tag rejected"
+elif [[ $err == *"not a single commit on top of"* ]]; then ok "wrong-parent src tag rejected"
+else no "wrong-parent: $err"; fi
+
+# --- go mod vendor misbehaviour, token scope (fake go in front of PATH) ---
+realgo=$(command -v go)
+mkdir -p "$tmp/fakebin"
+cat >"$tmp/fakebin/go" <<FAKE
+#!/usr/bin/env bash
+env >"$tmp/go-env.txt"
+[ -z "\${FAKE_GO_TOUCH:-}" ] || echo '// tampered' >>"\$FAKE_GO_TOUCH"
+exec "$realgo" "\$@"
+FAKE
+chmod +x "$tmp/fakebin/go"
+upstream "$tmp/up/nu" nu 1.0.0
+nsha=$(git -C "$tmp/up/nu" rev-parse HEAD)
+manifest nu "$tmp/up/nu" "$nsha"
+if err=$(PATH=$tmp/fakebin:$PATH SDK_PUBLIC=true FAKE_GO_TOUCH=main.go "$m" "$tmp/manifests/nu.json" 2>&1); then no "go mod vendor outside vendor/ rejected"
+elif [[ $err == *"changed files outside"* ]]; then ok "go mod vendor outside vendor/ rejected"
+else no "vendor outside: $err"; fi
+git -C "$tmp/mirrors/nu" rev-parse -q --verify "refs/tags/src/$nsha" >/dev/null 2>&1 && no "nothing pushed after the vendor failure" || ok "nothing pushed after the vendor failure"
+PATH=$tmp/fakebin:$PATH SDK_PUBLIC=true GH_TOKEN=sekret-token-value "$m" "$tmp/manifests/nu.json" >/dev/null 2>&1
+if [ -s "$tmp/go-env.txt" ] && ! grep -q 'GH_TOKEN\|sekret-token-value' "$tmp/go-env.txt"; then ok "GH_TOKEN absent from the go mod vendor environment"; else no "GH_TOKEN reached go mod vendor"; fi
+
+# --- plugin in a subdirectory, vendored under the subdir ------------------
+mkdir -p "$tmp/up/sigma/plugins/sigma"
+git init -q "$tmp/up/sigma"
+printf '{"name":"sigma","version":"0.2.0","sdk":"^0.10"}\n' >"$tmp/up/sigma/plugins/sigma/plugin.json"
+printf 'package main\n\nimport "example.com/dep"\n\nfunc main() { _ = dep.Hi() }\n' >"$tmp/up/sigma/plugins/sigma/main.go"
+printf 'module example.com/sigma\n\ngo 1.22\n\nrequire example.com/dep v1.0.0\n' >"$tmp/up/sigma/plugins/sigma/go.mod"
+(cd "$tmp/up/sigma/plugins/sigma" && go mod tidy >/dev/null 2>&1)
+gi -C "$tmp/up/sigma" add -A; gi -C "$tmp/up/sigma" commit -qm init
+ssha=$(git -C "$tmp/up/sigma" rev-parse HEAD)
+manifest sigma "$tmp/up/sigma" "$ssha" '.subdir = "plugins/sigma"'
+if out=$(SDK_PUBLIC=true "$m" "$tmp/manifests/sigma.json" 2>&1); then
+  sm=$tmp/mirrors/sigma
+  stop=$(git -C "$sm" rev-parse "src/$ssha^{commit}")
+  git -C "$sm" cat-file -e "$stop:plugins/sigma/vendor/modules.txt" 2>/dev/null && ok "subdir plugin vendored under the subdir" || no "subdir vendor path"
+  [ -z "$(git -C "$sm" diff --name-only "$ssha" "$stop" | grep -vE '^(plugins/sigma/vendor/|MIRROR\.json$)')" ] && ok "subdir mirror commit touches only <subdir>/vendor/ and MIRROR.json" || no "subdir mirror commit paths"
+  git -C "$sm" show "$stop:MIRROR.json" | jq -e '.subdir == "plugins/sigma"' >/dev/null && ok "MIRROR.json records the subdir" || no "MIRROR.json subdir"
+else no "subdir run: $out"; fi
+
+# --- a symlink in the subdir chain is refused -----------------------------
+mkdir -p "$tmp/up/tau/real"
+git init -q "$tmp/up/tau"
+printf '{"name":"tau","version":"1.0.0","sdk":"^0.10"}\n' >"$tmp/up/tau/real/plugin.json"
+printf 'module example.com/tau\n\ngo 1.22\n' >"$tmp/up/tau/real/go.mod"
+ln -s real "$tmp/up/tau/link"
+gi -C "$tmp/up/tau" add -A; gi -C "$tmp/up/tau" commit -qm init
+tsha=$(git -C "$tmp/up/tau" rev-parse HEAD)
+manifest tau "$tmp/up/tau" "$tsha" '.subdir = "link"'
+if err=$("$m" "$tmp/manifests/tau.json" 2>&1); then no "symlinked subdir refused"
+elif [[ $err == *"symlink"* ]]; then ok "symlinked subdir refused"; else no "symlinked subdir: $err"; fi
+
+# Fail when cases silently disappear.
+want=34
+if [ $((pass + failed)) -ne "$want" ]; then no "expected $want cases, ran $((pass + failed))"; fi
+
 echo "$pass passed, $failed failed"
 [ "$failed" -eq 0 ]
