@@ -1,0 +1,9 @@
+{
+  "name": "good",
+  "repo": "https://github.com/acme/hatamoto-good",
+  "commit": "0123456789abcdef0123456789abcdef01234567",
+  "author": "acme",
+  "license": "MIT",
+  "sdk": "^0.10",
+  "archive_grant": "yes"
+}
