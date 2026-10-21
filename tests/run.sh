@@ -103,5 +103,8 @@ else
   echo "skip gomod tests: go not found"
 fi
 
+# scripts/mirror-plugin.sh: offline fixture mirrors.
+if bash tests/mirror.sh; then ok "mirror-plugin.sh tests"; else no "mirror-plugin.sh tests"; fi
+
 echo "$pass passed, $failed failed"
 [ "$failed" -eq 0 ]
