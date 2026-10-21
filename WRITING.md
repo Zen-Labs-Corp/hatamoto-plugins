@@ -1,8 +1,8 @@
 # Write a Hatamoto plugin in your own GitHub repo
 
-> **Status:** the Hatamoto SDK (`hatamoto.dev/sdk`) becomes fetchable with
-> `go get` when Hatamoto core goes public. Submissions to this registry open at the
-> same time. The steps below are the path you will follow then.
+> **Status:** the Hatamoto SDK (`hatamoto.dev/sdk`, source at
+> <https://github.com/zenlabscorp/hatamoto-sdk>) is public: `go get` works today.
+> Community submissions to this registry open when Hatamoto core goes public.
 
 A plugin is a WebAssembly module built with the standard Go toolchain, plus a
 `plugin.json` that declares what it needs. It lives in your own repo. When it is
@@ -24,7 +24,7 @@ The full plugin reference (hooks, payloads, host functions, permissions) is
 mkdir hatamoto-acme-seo && cd hatamoto-acme-seo
 git init
 go mod init github.com/acme/hatamoto-acme-seo
-go get hatamoto.dev/sdk@v0.10.0
+go get hatamoto.dev/sdk@v0.11.0
 ```
 
 Your `go.mod` must resolve the SDK from the network. Do **not** add a `replace`
@@ -40,7 +40,7 @@ module github.com/acme/hatamoto-acme-seo
 
 go 1.27
 
-require hatamoto.dev/sdk v0.10.0
+require hatamoto.dev/sdk v0.11.0
 
 require github.com/extism/go-pdk v1.1.3 // indirect
 ```
@@ -171,7 +171,7 @@ recommended.
 {
   "name": "acme-seo",
   "version": "0.1.0",
-  "sdk": "^0.10",
+  "sdk": "^0.11",
   "description": "One sentence a site owner will read on the directory page.",
   "permissions": ["settings"],
   "limits": { "memory_pages": 256, "max_instances": 4 },
@@ -188,7 +188,7 @@ recommended.
 |---|---|
 | `name` | `^[a-z][a-z0-9-]{1,39}$`; also the name of your manifest file here |
 | `version` | your plugin's semver; bump it for every release |
-| `sdk` | SDK range you built against, for example `^0.10` |
+| `sdk` | SDK range you built against, for example `^0.11` |
 | `description` | shown on the directory page |
 | `permissions` | capabilities you ask for (`settings`, `kv`, `db`, `http.fetch`, ...). Ask for the least you need; reviewers check each one |
 | `allowed_hosts` | the hosts `http.fetch` may call; list them exactly |

@@ -13,9 +13,9 @@ is public, and an existing mirror is never re-vendored.
 Approved plugins are listed on <https://hatamoto.dev/plugins> and install with one
 click from Admin > Plugins > Browse registry.
 
-> **Status:** the Hatamoto SDK (`hatamoto.dev/sdk`) becomes fetchable when Hatamoto
-> core goes public. Submissions open at that time. Until then you can read the
-> guides, but plugins cannot yet be built outside the core repository.
+> **Status:** the Hatamoto SDK (`hatamoto.dev/sdk`) is public at
+> <https://github.com/zenlabscorp/hatamoto-sdk>, so plugins build outside the core
+> repository today. Community submissions open when Hatamoto core goes public.
 
 ## Guides
 

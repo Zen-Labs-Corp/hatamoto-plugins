@@ -13,7 +13,7 @@ the plugin's own `plugin.json`. This directory stays empty until submissions ope
   "author": "acme",
   "license": "MIT",
   "archive_grant": true,
-  "sdk": "^0.10"
+  "sdk": "^0.11"
 }
 ```
 

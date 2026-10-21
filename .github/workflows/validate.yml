@@ -2,9 +2,8 @@
 # by the Hatamoto release manager, never by CI.
 #
 # The `build` job compiles each changed plugin at its pinned commit. It needs the
-# Hatamoto SDK (hatamoto.dev/sdk), which can be fetched only once Hatamoto core is
-# public, so it runs only when the repository variable SDK_PUBLIC is 'true'. Set it
-# at the same time submissions open.
+# public Hatamoto SDK (hatamoto.dev/sdk); it runs only when the repository variable
+# SDK_PUBLIC is 'true', which is set once the SDK repository is published.
 name: validate
 
 on:
