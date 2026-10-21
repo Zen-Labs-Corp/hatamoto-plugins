@@ -5,7 +5,9 @@ The community plugin registry for [Hatamoto](https://hatamoto.dev). Each file in
 commit. A merged manifest means the plugin is approved: the Hatamoto team builds
 it from that commit, signs it with the Hatamoto key and publishes it. At merge a
 copy of the pinned source is also archived in a repo the project owns, so removing
-the author's repo does not remove an approved plugin.
+the author's repo does not remove an approved plugin. The copy is the source at
+the pinned commit; vendored dependencies are a last resort added only when the SDK
+is public, and an existing mirror is never re-vendored.
 
 Approved plugins are listed on <https://hatamoto.dev/plugins> and install with one
 click from Admin > Plugins > Browse registry.
@@ -29,6 +31,23 @@ Run the same checks locally:
 bash tests/run.sh                         # validator self-test
 scripts/validate-manifest.sh manifests/acme-seo.json --remote
 ```
+
+## Maintainer setup for the mirror
+
+`.github/workflows/mirror.yml` needs this once:
+
+- **Token.** A fine-grained personal access token, resource owner
+  `hatamoto-plugins-archive`, Repository access: All repositories, permissions
+  Administration (read and write) and Contents (read and write). If the
+  organization requires approval for fine-grained tokens, approve it in the
+  organization settings. Give it an expiry and rotate it before it lapses.
+- **Environment.** Create the environment `plugin-mirror` in this repository with
+  deployment branches limited to `main`, optionally with required reviewers, and
+  store the token there as the environment secret `MIRROR_TOKEN` (not as a
+  repository secret). Set the variables `MIRROR_ORG` and, when the SDK is public,
+  `SDK_PUBLIC=true`.
+- **Ruleset.** In the archive organization, add a ruleset on all repositories that
+  blocks deletion and non-fast-forward updates of `main`, `src/*` and `v*` tags.
 
 ## License
 
