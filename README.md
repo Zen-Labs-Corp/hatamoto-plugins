@@ -2,7 +2,8 @@
 
 The community plugin registry for [Hatamoto](https://hatamoto.dev). Each file in
 `manifests/` pins one plugin, hosted in its author's own GitHub repo, to an exact
-commit. A merged manifest means the plugin is approved: the Hatamoto team builds
+commit. First-party plugins (`gtm`, `searchconsole`) are listed the same way, from
+repos under `github.com/zenlabscorp/`, with `tier: first-party` instead of an author. A merged manifest means the plugin is approved: the Hatamoto team builds
 it from that commit, signs it with the Hatamoto key and publishes it. At merge a
 copy of the pinned source is also archived in a repo the project owns, so removing
 the author's repo does not remove an approved plugin. The copy is the source at
