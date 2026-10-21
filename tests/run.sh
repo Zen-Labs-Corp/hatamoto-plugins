@@ -92,7 +92,8 @@ jq 'del(.author)' "$f/good.json" > "$tmp/good.json"
 if err=$("$v" "$tmp/good.json" 2>&1 >/dev/null); then no "missing author rejected"
 elif [[ $err == *"missing required field: author"* ]]; then ok "missing author rejected"; else no "missing author: $err"; fi
 
-# manifests/schema.json agrees on the same cases (skipped without python3 jsonschema).
+# manifests/schema.json agrees on the same cases. Needs python3 jsonschema; a missing
+# module fails the suite unless SCHEMA_TESTS_ALLOW_SKIP=1.
 if python3 -c 'import jsonschema' >/dev/null 2>&1; then
   sv() { python3 - "$1" <<'PY'
 import json, sys, jsonschema
@@ -112,8 +113,10 @@ PY
   fp gtm zenlabscorp; jq '.author = "zenlabscorp"' "$tmp/gtm.json" > "$tmp/x.json"; sc reject "tier with author" "$tmp/x.json"
   jq '.tier = "community"' "$tmp/gtm.json" > "$tmp/x.json"; sc reject "tier community" "$tmp/x.json"
   jq 'del(.author)' "$f/good.json" > "$tmp/x.json"; sc reject "no tier, no author" "$tmp/x.json"
+elif [ "${SCHEMA_TESTS_ALLOW_SKIP:-}" = 1 ]; then
+  echo "skip schema tests: python3 jsonschema not found (SCHEMA_TESTS_ALLOW_SKIP=1)"
 else
-  echo "skip schema tests: python3 jsonschema not found"
+  no "schema tests need python3 jsonschema (set SCHEMA_TESTS_ALLOW_SKIP=1 to skip)"
 fi
 
 # archive_grant must be JSON true; every allowlisted license is accepted.
