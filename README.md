@@ -3,7 +3,9 @@
 The community plugin registry for [Hatamoto](https://hatamoto.dev). Each file in
 `manifests/` pins one plugin, hosted in its author's own GitHub repo, to an exact
 commit. A merged manifest means the plugin is approved: the Hatamoto team builds
-it from that commit, signs it with the Hatamoto key and publishes it.
+it from that commit, signs it with the Hatamoto key and publishes it. At merge a
+copy of the pinned source is also archived in a repo the project owns, so removing
+the author's repo does not remove an approved plugin.
 
 Approved plugins are listed on <https://hatamoto.dev/plugins> and install with one
 click from Admin > Plugins > Browse registry.

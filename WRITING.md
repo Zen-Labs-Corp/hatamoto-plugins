@@ -295,3 +295,8 @@ The directory card heads with your plugin's `name` (for example `acme-seo`). To 
 a friendlier heading such as "Acme SEO Helper", add the optional manifest field
 `"title"` (1 to 60 characters, no control characters, no leading or trailing space); the `name` and version stay on the line
 below it.
+
+Every manifest also needs `"archive_grant": true` (your grant to archive, build,
+sign and redistribute the source at the pinned commit) and a `license` from the
+allowlist in [CONTRIBUTING.md](CONTRIBUTING.md). After the merge a copy of your
+source is kept at `github.com/<archive>/<name>`.
