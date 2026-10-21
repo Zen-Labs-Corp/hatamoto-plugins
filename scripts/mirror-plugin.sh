@@ -21,7 +21,7 @@
 #   GH_TOKEN      token with Administration + Contents write on that org; read once,
 #                 unset, and given only to the gh api calls and the push
 #   SDK_PUBLIC    "true" to vendor dependencies (needs the SDK to be fetchable)
-#   GOTOOLCHAIN   pinned Go toolchain for go mod vendor (default go1.27.2)
+#   GOTOOLCHAIN   pinned Go toolchain for go mod vendor (default go1.27.3)
 # Tests only:
 #   HATAMOTO_ALLOW_FILE_REPOS=1  accept file:/// manifest repos
 #   MIRROR_BASE=file:///dir MIRROR_CREATE=local  mirrors are bare repos under dir
@@ -189,7 +189,7 @@ mirrored_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 # 4. The mirror commit: vendor/ (optional) and MIRROR.json on top of the pinned commit.
 vendored=false
 if [ "${SDK_PUBLIC:-}" = true ]; then
-  (cd "$plug" && GOTOOLCHAIN=${GOTOOLCHAIN:-go1.27.2} GOWORK=off go mod vendor) || die "go mod vendor failed"
+  (cd "$plug" && GOTOOLCHAIN=${GOTOOLCHAIN:-go1.27.3} GOWORK=off go mod vendor) || die "go mod vendor failed"
   if [ -d "$src/$vendor_path" ]; then
     vendored=true
     g add -f -A -- "$vendor_path"

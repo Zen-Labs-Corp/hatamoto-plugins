@@ -83,7 +83,7 @@ A maintainer reads the source at the pinned commit. We look for:
 - **Reproducible build.** It builds from a clean checkout with the recipe in
   WRITING.md, no `replace` for the SDK, no local-path `replace`, no `go.work`, no
   `go generate`, no network use at build time beyond fetching Go modules. The Go
-  version in `go.mod` must not exceed the pinned toolchain (currently go1.27.2);
+  version in `go.mod` must not exceed the pinned toolchain (currently go1.27.3);
   the build never downloads a newer one. CI checks these rules with
   `scripts/check-gomod.sh`.
 - **Justified permissions.** Each entry in `permissions` is needed for a
