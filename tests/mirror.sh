@@ -10,7 +10,12 @@ failed=0
 ok() { echo "ok   $1"; pass=$((pass + 1)); }
 no() { echo "FAIL $1"; failed=$((failed + 1)); }
 
-if ! command -v go >/dev/null; then echo "skip mirror tests: go not found"; exit 0; fi
+# Without go nothing can be tested: fail, so CI cannot go green without running
+# these. MIRROR_TESTS_ALLOW_SKIP=1 turns that into a skip (exit 77).
+if ! command -v go >/dev/null; then
+  if [ "${MIRROR_TESTS_ALLOW_SKIP:-}" = 1 ]; then echo "skip mirror tests: go not found"; exit 77; fi
+  echo "FAIL mirror tests need go (set MIRROR_TESTS_ALLOW_SKIP=1 to skip)"; exit 1
+fi
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
