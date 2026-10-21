@@ -1,8 +1,8 @@
 # Submit a plugin
 
-> **Status:** submissions open when Hatamoto core goes public and the SDK
-> (`hatamoto.dev/sdk`) is fetchable. Until then pull requests that add manifests
-> will not be merged.
+> **Status:** the SDK (`hatamoto.dev/sdk`) is public, so you can build and test a
+> plugin today. Community submissions open when Hatamoto core goes public; until
+> then pull requests that add community manifests will not be merged.
 
 Approved plugins are listed at <https://hatamoto.dev/plugins> and install with
 one click from Admin > Plugins > Browse registry. To write one first, read
@@ -38,7 +38,7 @@ Add `manifests/<name>.json`, where `<name>` is the `name` in your `plugin.json`:
   "author": "acme",
   "license": "MIT",
   "archive_grant": true,
-  "sdk": "^0.10"
+  "sdk": "^0.11"
 }
 ```
 
