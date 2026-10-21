@@ -4,5 +4,6 @@
   "commit": "abc123",
   "author": "acme",
   "license": "MIT",
-  "sdk": "^0.10"
+  "sdk": "^0.10",
+  "archive_grant": true
 }

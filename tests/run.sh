@@ -31,6 +31,9 @@ expect_reject bad-repo.json "repo must be https://github.com"
 expect_reject missing-sdk.json "missing required field: sdk"
 expect_reject extra-field.json "unknown field(s): price"
 expect_reject bad-title.json "title must be 1 to 60"
+expect_reject missing-grant.json "missing required field: archive_grant"
+expect_reject bad-grant.json "archive_grant must be true"
+expect_reject bad-license.json "license must be one of"
 
 # name must equal the file name.
 tmp=$(mktemp -d)
@@ -46,6 +49,20 @@ for r in gtm webhooks searchconsole hello; do
   if err=$("$v" "$tmp/$r.json" 2>&1 >/dev/null); then no "reserved name $r rejected"
   elif [[ $err == *"reserved for a first-party plugin"* ]]; then ok "reserved name $r rejected"
   else no "reserved name $r: $err"; fi
+done
+
+# archive_grant must be JSON true; every allowlisted license is accepted.
+for case in '"archive_grant": false' '"archive_grant": null' '"archive_grant": 1'; do
+  jq ". + {$case}" "$f/good.json" > "$tmp/good.json"
+  if "$v" "$tmp/good.json" >/dev/null 2>&1; then no "rejects $case"; else ok "rejects $case"; fi
+done
+for l in MIT Apache-2.0 BSD-2-Clause BSD-3-Clause ISC MPL-2.0 GPL-2.0 GPL-2.0-only GPL-2.0-or-later GPL-3.0 GPL-3.0-only GPL-3.0-or-later LGPL-2.1 LGPL-2.1-only LGPL-2.1-or-later LGPL-3.0 LGPL-3.0-only LGPL-3.0-or-later AGPL-3.0 AGPL-3.0-only AGPL-3.0-or-later; do
+  jq --arg l "$l" '. + {license: $l}' "$f/good.json" > "$tmp/good.json"
+  if "$v" "$tmp/good.json" >/dev/null 2>&1; then ok "accepts license $l"; else no "accepts license $l"; fi
+done
+for l in WTFPL Proprietary "" mit "MIT OR Apache-2.0" AGPL-1.0; do
+  jq --arg l "$l" '. + {license: $l}' "$f/good.json" > "$tmp/good.json"
+  if "$v" "$tmp/good.json" >/dev/null 2>&1; then no "rejects license '$l'"; else ok "rejects license '$l'"; fi
 done
 
 # title: a display name, 1 to 60 characters, no control characters, no leading or trailing space.
