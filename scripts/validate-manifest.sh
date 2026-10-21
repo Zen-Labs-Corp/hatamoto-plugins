@@ -17,6 +17,11 @@ for l in GPL-2.0 GPL-3.0 LGPL-2.1 LGPL-3.0 AGPL-3.0; do
   licenses+=("$l" "$l-only" "$l-or-later")
 done
 
+# Owners whose repos may carry tier "first-party" (space separated, lowercase,
+# compared case-insensitively against the exact repo owner); keep in sync with
+# manifests/schema.json and FIRST_PARTY_OWNERS in the registry build script.
+FIRST_PARTY_OWNERS="zenlabscorp"
+
 usage() { echo "usage: $0 <manifest.json> [--remote]" >&2; exit 2; }
 
 [ $# -ge 1 ] && [ $# -le 2 ] || usage
@@ -42,14 +47,14 @@ field() { jq -r --arg k "$1" 'if (.[$k] | type) == "string" then .[$k] else "" e
 has() { jq -e --arg k "$1" 'has($k)' "$file" >/dev/null; }
 
 # Unknown keys.
-extra=$(jq -r '[keys[] | select(IN("name","repo","commit","subdir","title","author","license","sdk","homepage","archive_grant") | not)] | join(", ")' "$file")
+extra=$(jq -r '[keys[] | select(IN("name","repo","commit","subdir","title","author","license","sdk","homepage","archive_grant","tier") | not)] | join(", ")' "$file")
 [ -z "$extra" ] || bad "unknown field(s): $extra"
 
 # Required keys, and every present key except archive_grant must be a string.
-for k in name repo commit author license sdk archive_grant; do
+for k in name repo commit license sdk archive_grant; do
   has "$k" || bad "missing required field: $k"
 done
-for k in name repo commit subdir title author license sdk homepage; do
+for k in name repo commit subdir title author license sdk homepage tier; do
   if has "$k" && ! jq -e --arg k "$k" '.[$k] | type == "string"' "$file" >/dev/null; then
     bad "$k must be a string"
   fi
@@ -66,6 +71,7 @@ commit=$(field commit)
 subdir=$(field subdir)
 title=$(field title)
 author=$(field author)
+tier=$(field tier)
 license=$(field license)
 sdk=$(field sdk)
 homepage=$(field homepage)
@@ -73,9 +79,42 @@ homepage=$(field homepage)
 if has name && ! [[ $name =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
   bad "name must match ^[a-z][a-z0-9-]{1,39}\$"
 fi
-# First-party plugins; community manifests must not take these names.
-for reserved in gtm webhooks searchconsole hello; do
+
+# Repo owner (exact, lowercased) and whether it is on the first-party allowlist.
+# A file:/// repo (offline tests only) uses its parent directory as the owner.
+owner=""
+if [[ $repo =~ ^https://github\.com/([A-Za-z0-9._-]+)/[A-Za-z0-9._-]+$ ]]; then
+  owner=${BASH_REMATCH[1]}
+elif [[ $repo =~ ^file:///([A-Za-z0-9._/-]+)/[A-Za-z0-9._-]+$ ]]; then
+  owner=${BASH_REMATCH[1]##*/}
+fi
+owner=$(printf '%s' "$owner" | tr '[:upper:]' '[:lower:]')
+owner_ok=0
+for o in $FIRST_PARTY_OWNERS; do
+  if [ -n "$owner" ] && [ "$owner" = "$o" ]; then owner_ok=1; fi
+done
+
+# tier: only "first-party", only from an allowlisted owner, never with an author.
+if has tier; then
+  if [ "$tier" != "first-party" ]; then
+    bad "tier must be \"first-party\" when present"
+  else
+    [ "$owner_ok" -eq 1 ] || bad "tier first-party requires a repo owned by: $FIRST_PARTY_OWNERS"
+    has author && bad "author must be absent for tier first-party"
+  fi
+else
+  has author || bad "missing required field: author"
+fi
+
+# Reserved names. gtm and searchconsole are first-party only; webhooks and hello
+# are never accepted. Keep in sync with the registry build script.
+for reserved in webhooks hello; do
   if [ "$name" = "$reserved" ]; then bad "name \"$name\" is reserved for a first-party plugin"; fi
+done
+for reserved in gtm searchconsole; do
+  if [ "$name" = "$reserved" ] && { [ "$tier" != "first-party" ] || [ "$owner_ok" -ne 1 ]; }; then
+    bad "name \"$name\" is reserved for a first-party plugin"
+  fi
 done
 base=$(basename "$file" .json)
 if has name && [ "$name" != "$base" ]; then

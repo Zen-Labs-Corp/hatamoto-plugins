@@ -43,13 +43,78 @@ if err=$("$v" "$tmp/other.json" 2>&1 >/dev/null); then no "name/file mismatch re
 elif [[ $err == *"must equal the file name"* ]]; then ok "name/file mismatch rejected"
 else no "name/file mismatch: $err"; fi
 
-# Reserved first-party names.
+# Reserved first-party names (community manifests, no tier).
 for r in gtm webhooks searchconsole hello; do
   jq --arg n "$r" '.name = $n' "$f/good.json" > "$tmp/$r.json"
   if err=$("$v" "$tmp/$r.json" 2>&1 >/dev/null); then no "reserved name $r rejected"
   elif [[ $err == *"reserved for a first-party plugin"* ]]; then ok "reserved name $r rejected"
   else no "reserved name $r: $err"; fi
 done
+
+# First-party tier. fp <name> <owner> writes a manifest without author.
+fp() { jq --arg n "$1" --arg r "https://github.com/$2/hatamoto-plugin-$1" '.name = $n | .repo = $r | .tier = "first-party" | del(.author)' "$f/good.json" > "$tmp/$1.json"; }
+for n in gtm searchconsole; do
+  fp "$n" zenlabscorp
+  if "$v" "$tmp/$n.json" >/dev/null 2>&1; then ok "first-party $n accepted"; else no "first-party $n accepted"; fi
+done
+fp gtm ZenLabsCorp
+if "$v" "$tmp/gtm.json" >/dev/null 2>&1; then ok "first-party owner ZenLabsCorp accepted"; else no "first-party owner ZenLabsCorp accepted"; fi
+fp acme-seo zenlabscorp
+if "$v" "$tmp/acme-seo.json" >/dev/null 2>&1; then ok "first-party non-reserved name accepted"; else no "first-party non-reserved name accepted"; fi
+# reject_fp <label> <want> <name> <jq filter over the first-party manifest> [owner]
+reject_fp() {
+  local label=$1 want=$2 n=$3 filter=$4 owner=${5:-zenlabscorp} err
+  fp "$n" "$owner"
+  jq "$filter" "$tmp/$n.json" > "$tmp/x.json" && mv "$tmp/x.json" "$tmp/$n.json"
+  if err=$("$v" "$tmp/$n.json" 2>&1 >/dev/null); then no "$label rejected (exit 0)"
+  elif [[ $err == *"$want"* ]]; then ok "$label rejected"
+  else no "$label: $err"; fi
+}
+reject_fp "gtm first-party from acme" "tier first-party requires" gtm . acme
+reject_fp "searchconsole first-party from acme" "tier first-party requires" searchconsole . acme
+reject_fp "non-reserved first-party from acme" "tier first-party requires" acme-seo . acme
+reject_fp "gtm from zenlabscorp without tier" "reserved for a first-party plugin" gtm 'del(.tier) | .author = "zenlabscorp"'
+reject_fp "searchconsole from zenlabscorp without tier" "reserved for a first-party plugin" searchconsole 'del(.tier) | .author = "zenlabscorp"'
+reject_fp "tier with author" "author must be absent" gtm '.author = "zenlabscorp"'
+reject_fp "tier community" "tier must be" gtm '.tier = "community"'
+reject_fp "tier junk" "tier must be" acme-seo '.tier = "x"'
+reject_fp "tier non-string" "tier must be a string" acme-seo '.tier = true'
+reject_fp "webhooks first-party from zenlabscorp" "reserved for a first-party plugin" webhooks .
+reject_fp "hello first-party from zenlabscorp" "reserved for a first-party plugin" hello .
+for o in zenlabscorp-evil zenlabscorpx zenlabscorp.evil xzenlabscorp; do
+  reject_fp "look-alike owner $o" "tier first-party requires" gtm . "$o"
+done
+# tier on a community-owned good.json (author present, acme owner) is refused too.
+jq '. + {"tier": "first-party"}' "$f/good.json" > "$tmp/good.json"
+if "$v" "$tmp/good.json" >/dev/null 2>&1; then no "community manifest with tier rejected"; else ok "community manifest with tier rejected"; fi
+# author is still required without a tier.
+jq 'del(.author)' "$f/good.json" > "$tmp/good.json"
+if err=$("$v" "$tmp/good.json" 2>&1 >/dev/null); then no "missing author rejected"
+elif [[ $err == *"missing required field: author"* ]]; then ok "missing author rejected"; else no "missing author: $err"; fi
+
+# manifests/schema.json agrees on the same cases (skipped without python3 jsonschema).
+if python3 -c 'import jsonschema' >/dev/null 2>&1; then
+  sv() { python3 - "$1" <<'PY'
+import json, sys, jsonschema
+s = json.load(open("manifests/schema.json"))
+sys.exit(0 if jsonschema.Draft202012Validator(s).is_valid(json.load(open(sys.argv[1]))) else 1)
+PY
+  }
+  sc() { # sc <want accept|reject> <label> <file>
+    if sv "$3"; then [ "$1" = accept ] && ok "schema: $2" || no "schema: $2"
+    else [ "$1" = reject ] && ok "schema: $2" || no "schema: $2"; fi
+  }
+  sc accept "good.json" "$f/good.json"
+  fp gtm zenlabscorp; sc accept "first-party gtm" "$tmp/gtm.json"
+  fp gtm ZenLabsCorp; sc accept "first-party ZenLabsCorp" "$tmp/gtm.json"
+  fp gtm acme; sc reject "first-party from acme" "$tmp/gtm.json"
+  for o in zenlabscorp-evil zenlabscorpx zenlabscorp.evil; do fp gtm "$o"; sc reject "look-alike $o" "$tmp/gtm.json"; done
+  fp gtm zenlabscorp; jq '.author = "zenlabscorp"' "$tmp/gtm.json" > "$tmp/x.json"; sc reject "tier with author" "$tmp/x.json"
+  jq '.tier = "community"' "$tmp/gtm.json" > "$tmp/x.json"; sc reject "tier community" "$tmp/x.json"
+  jq 'del(.author)' "$f/good.json" > "$tmp/x.json"; sc reject "no tier, no author" "$tmp/x.json"
+else
+  echo "skip schema tests: python3 jsonschema not found"
+fi
 
 # archive_grant must be JSON true; every allowlisted license is accepted.
 for case in '"archive_grant": false' '"archive_grant": null' '"archive_grant": 1'; do
