@@ -60,12 +60,12 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
-          go-version: '1.27.2'
+          go-version: '1.27.3'
       - name: Build changed plugins at their pinned commits
         env:
           BASE_REF: ${{ github.base_ref }}
           # The registry build uses this exact toolchain (core backend/go.mod) and never downloads another.
-          GOTOOLCHAIN: go1.27.2
+          GOTOOLCHAIN: go1.27.3
           GOWORK: 'off'
           GOFLAGS: -mod=readonly
         run: |

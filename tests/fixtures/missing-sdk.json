@@ -3,5 +3,6 @@
   "repo": "https://github.com/acme/x",
   "commit": "0123456789abcdef0123456789abcdef01234567",
   "author": "acme",
-  "license": "MIT"
+  "license": "MIT",
+  "archive_grant": true
 }

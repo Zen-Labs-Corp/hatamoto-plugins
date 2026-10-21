@@ -31,7 +31,7 @@ Your `go.mod` must resolve the SDK from the network. Do **not** add a `replace`
 line for `hatamoto.dev/sdk` (to any target), no local-path `replace` and no
 `go.work` file; the registry build runs in a clean checkout and refuses a plugin
 that has any of them. It also builds with the Hatamoto team's pinned Go toolchain
-(currently go1.27.2) and never downloads a newer one, so a plugin whose `go.mod`
+(currently go1.27.3) and never downloads a newer one, so a plugin whose `go.mod`
 requires a newer Go than that toolchain fails to build. After `go mod tidy` it
 looks like this:
 
@@ -295,3 +295,8 @@ The directory card heads with your plugin's `name` (for example `acme-seo`). To 
 a friendlier heading such as "Acme SEO Helper", add the optional manifest field
 `"title"` (1 to 60 characters, no control characters, no leading or trailing space); the `name` and version stay on the line
 below it.
+
+Every manifest also needs `"archive_grant": true` (your grant to archive, build,
+sign and redistribute the source at the pinned commit) and a `license` from the
+allowlist in [CONTRIBUTING.md](CONTRIBUTING.md). After the merge a copy of your
+source at the pinned commit is kept at `github.com/<archive>/<name>`.

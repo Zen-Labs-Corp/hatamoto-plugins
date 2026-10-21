@@ -12,6 +12,7 @@ the plugin's own `plugin.json`. This directory stays empty until submissions ope
   "subdir": "",
   "author": "acme",
   "license": "MIT",
+  "archive_grant": true,
   "sdk": "^0.10"
 }
 ```
@@ -23,7 +24,8 @@ the plugin's own `plugin.json`. This directory stays empty until submissions ope
 | `commit` | yes | full 40 character lowercase hex commit id (not a branch or tag) |
 | `subdir` | no | folder of the plugin inside the repo; letters, digits, `.`, `_`, `/`, `-`; no `..`, no leading `/` |
 | `author` | yes | your GitHub name, shown as "by @author"; `^[A-Za-z0-9][A-Za-z0-9-]{0,38}$` |
-| `license` | yes | SPDX id of the plugin's license, for example `MIT` or `Apache-2.0` |
+| `license` | yes | SPDX id from the allowlist: `MIT`, `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `ISC`, `MPL-2.0`, `GPL-2.0`, `GPL-3.0`, `LGPL-2.1`, `LGPL-3.0`, `AGPL-3.0` (GPL, LGPL and AGPL also as `-only` or `-or-later`) |
+| `archive_grant` | yes | must be the JSON value `true`: the author grants the Hatamoto project a perpetual, irrevocable right to archive, build, sign and redistribute the source at the pinned commit and its builds |
 | `sdk` | yes | SDK range you built against; must match `sdk` in `plugin.json` |
 | `homepage` | no | an `https://` link |
 
