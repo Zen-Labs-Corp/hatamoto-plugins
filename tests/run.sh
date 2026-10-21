@@ -103,6 +103,16 @@ else
   echo "skip gomod tests: go not found"
 fi
 
+# scripts/mirror-rulesets.sh: payloads of the repository rulesets.
+r=scripts/mirror-rulesets.sh
+if "$r" tag | jq -e '.name == "archive-tags" and .target == "tag" and .enforcement == "active"
+  and .conditions.ref_name.include == ["refs/tags/src/*", "refs/tags/v*"]
+  and ([.rules[].type] | sort) == ["deletion", "update"]' >/dev/null; then ok "tag ruleset payload"; else no "tag ruleset payload"; fi
+if "$r" branch | jq -e '.name == "archive-main" and .target == "branch" and .enforcement == "active"
+  and .conditions.ref_name.include == ["refs/heads/main"]
+  and ([.rules[].type] | sort) == ["deletion", "non_fast_forward"]' >/dev/null; then ok "branch ruleset payload"; else no "branch ruleset payload"; fi
+if "$r" bogus >/dev/null 2>&1; then no "ruleset kind rejected"; else ok "ruleset kind rejected"; fi
+
 # scripts/mirror-plugin.sh: offline fixture mirrors.
 if bash tests/mirror.sh; then ok "mirror-plugin.sh tests"; else no "mirror-plugin.sh tests"; fi
 

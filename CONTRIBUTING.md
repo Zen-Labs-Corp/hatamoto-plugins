@@ -110,10 +110,17 @@ The mirror adds `vendor/` only as a last resort, and only while the maintainers
 have `SDK_PUBLIC=true`. A mirror made before that is not re-vendored later: the
 source copy at your commit is the archive, and the build can fetch dependencies
 itself. Re-running the mirror is safe: an existing `src/<commit>` is verified and
-kept, and the upstream repo is not needed for it. It then shows up in Browse
-registry on every Hatamoto server and as a card on
-<https://hatamoto.dev/plugins>, labelled "Community" and "by @author". Publishing
-is done by a person with the signing key, so it can lag the merge by a little.
+kept, and the upstream repo is not needed for it.
+
+Each mirror repo carries two repository rulesets, `archive-tags` (the `src/*` and
+`v*` tags cannot be updated or deleted) and `archive-main` (`main` cannot be
+deleted or force-pushed). The Admin token of the archive organization could still
+remove a ruleset or delete a repo, so custody of that token is the real control.
+
+Your plugin then shows up in Browse registry on every Hatamoto server and as a
+card on <https://hatamoto.dev/plugins>, labelled "Community" and "by @author".
+Publishing is done by a person with the signing key, so it can lag the merge by a
+little.
 
 ## Updating a plugin
 

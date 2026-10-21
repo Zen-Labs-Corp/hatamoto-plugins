@@ -46,8 +46,12 @@ scripts/validate-manifest.sh manifests/acme-seo.json --remote
   store the token there as the environment secret `MIRROR_TOKEN` (not as a
   repository secret). Set the variables `MIRROR_ORG` and, when the SDK is public,
   `SDK_PUBLIC=true`.
-- **Ruleset.** In the archive organization, add a ruleset on all repositories that
-  blocks deletion and non-fast-forward updates of `main`, `src/*` and `v*` tags.
+- **Rulesets.** Nothing to set up: `mirror-plugin.sh` adds two repository rulesets
+  (these work on a free organization) to every mirror repo, new or existing:
+  `archive-tags` (refs `src/*` and `v*`: block update and deletion) and
+  `archive-main` (`main`: block deletion and non-fast-forward updates). The Admin
+  token can still remove a ruleset or delete a repo, so who holds the token is the
+  real control.
 
 ## License
 

@@ -19,7 +19,7 @@
 # Environment:
 #   MIRROR_ORG    GitHub organization that owns the mirrors (required unless MIRROR_BASE)
 #   GH_TOKEN      token with Administration + Contents write on that org; read once,
-#                 unset, and given only to the gh create call and the push
+#                 unset, and given only to the gh api calls and the push
 #   SDK_PUBLIC    "true" to vendor dependencies (needs the SDK to be fetchable)
 #   GOTOOLCHAIN   pinned Go toolchain for go mod vendor (default go1.27.2)
 # Tests only:
@@ -96,6 +96,26 @@ else
       echo "created $org/$name" ;;
     *) die "cannot look up $org/$name: HTTP status ${status:-unknown}" ;;
   esac
+fi
+
+# Repository rulesets (they work on a free organization): the archive tags can
+# be neither moved nor deleted, and main can be neither deleted nor force-pushed.
+# Added to a new repo and to an existing one that lacks them. An Admin token can
+# still remove a ruleset or the repo, so custody of the token is the real control.
+if [ "$local_mode" -eq 1 ]; then
+  echo "$name: test mode, skipping repository rulesets" >&2
+else
+  have=$(GH_TOKEN=$token gh api "repos/$org/$name/rulesets" --jq '.[].name' 2>/dev/null) \
+    || die "cannot list rulesets of $org/$name"
+  for kind in tag branch; do
+    rs=$("$here/mirror-rulesets.sh" "$kind")
+    rname=$(printf '%s' "$rs" | jq -r .name)
+    if ! printf '%s\n' "$have" | grep -qxF -- "$rname"; then
+      printf '%s' "$rs" | GH_TOKEN=$token gh api -X POST "repos/$org/$name/rulesets" --input - >/dev/null \
+        || die "cannot create ruleset $rname on $org/$name"
+      echo "$name: created ruleset $rname"
+    fi
+  done
 fi
 
 # 2. An existing src/<commit> wins: verify it and finish without contacting the
