@@ -17,10 +17,14 @@
     "homepage": { "type": "string", "pattern": "^https://" },
     "tier": { "const": "first-party" }
   },
+  "not": { "required": ["name"], "properties": { "name": { "enum": ["webhooks", "hello"] } } },
   "if": { "required": ["tier"] },
   "then": {
     "not": { "required": ["author"] },
     "properties": { "repo": { "pattern": "^https://github\\.com/[Zz][Ee][Nn][Ll][Aa][Bb][Ss][Cc][Oo][Rr][Pp]/[A-Za-z0-9._-]+$" } }
   },
-  "else": { "required": ["author"] }
+  "else": {
+    "required": ["author"],
+    "not": { "required": ["name"], "properties": { "name": { "enum": ["gtm", "searchconsole"] } } }
+  }
 }

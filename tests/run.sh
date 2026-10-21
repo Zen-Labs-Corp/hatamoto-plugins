@@ -113,6 +113,12 @@ PY
   fp gtm zenlabscorp; jq '.author = "zenlabscorp"' "$tmp/gtm.json" > "$tmp/x.json"; sc reject "tier with author" "$tmp/x.json"
   jq '.tier = "community"' "$tmp/gtm.json" > "$tmp/x.json"; sc reject "tier community" "$tmp/x.json"
   jq 'del(.author)' "$f/good.json" > "$tmp/x.json"; sc reject "no tier, no author" "$tmp/x.json"
+  for r in webhooks hello gtm searchconsole; do
+    jq --arg n "$r" '.name = $n' "$f/good.json" > "$tmp/x.json"; sc reject "community reserved name $r" "$tmp/x.json"
+  done
+  for r in webhooks hello; do fp "$r" zenlabscorp; sc reject "first-party reserved name $r" "$tmp/$r.json"; done
+  fp searchconsole zenlabscorp; sc accept "first-party searchconsole" "$tmp/searchconsole.json"
+  fp searchconsole acme; sc reject "first-party searchconsole from acme" "$tmp/searchconsole.json"
 elif [ "${SCHEMA_TESTS_ALLOW_SKIP:-}" = 1 ]; then
   echo "skip schema tests: python3 jsonschema not found (SCHEMA_TESTS_ALLOW_SKIP=1)"
 else
