@@ -73,7 +73,7 @@ git init -q --bare "$tmp/mirrors/beta"
 git -C "$tmp/seed" push -q "$tmp/mirrors/beta" "refs/tags/src/$bsha"
 tag_before=$(git -C "$tmp/mirrors/beta" rev-parse "src/$bsha")
 if err=$("$m" "$tmp/manifests/beta.json" 2>&1); then no "differing content rejected"
-elif [[ $err == *"append-only"* ]]; then ok "differing content under src/<commit> rejected"
+elif [[ $err == *"touches extra.txt"* ]]; then ok "differing content under src/<commit> rejected"
 else no "differing content: $err"; fi
 [ "$tag_before" = "$(git -C "$tmp/mirrors/beta" rev-parse "src/$bsha")" ] && ok "tag not moved" || no "tag moved"
 [ -z "$(git -C "$tmp/mirrors/beta" tag -l 'v*')" ] && ok "nothing else pushed after the refusal" || no "extra tags pushed"
