@@ -10,6 +10,13 @@ set -euo pipefail
 # Count characters, not bytes, in the title check.
 export LC_ALL=C.UTF-8
 
+# License allowlist (SPDX ids); keep in sync with manifests/schema.json and the
+# registry build script. GPL, LGPL and AGPL also accept -only and -or-later.
+licenses=(MIT Apache-2.0 BSD-2-Clause BSD-3-Clause ISC MPL-2.0)
+for l in GPL-2.0 GPL-3.0 LGPL-2.1 LGPL-3.0 AGPL-3.0; do
+  licenses+=("$l" "$l-only" "$l-or-later")
+done
+
 usage() { echo "usage: $0 <manifest.json> [--remote]" >&2; exit 2; }
 
 [ $# -ge 1 ] && [ $# -le 2 ] || usage
@@ -35,11 +42,11 @@ field() { jq -r --arg k "$1" 'if (.[$k] | type) == "string" then .[$k] else "" e
 has() { jq -e --arg k "$1" 'has($k)' "$file" >/dev/null; }
 
 # Unknown keys.
-extra=$(jq -r '[keys[] | select(IN("name","repo","commit","subdir","title","author","license","sdk","homepage") | not)] | join(", ")' "$file")
+extra=$(jq -r '[keys[] | select(IN("name","repo","commit","subdir","title","author","license","sdk","homepage","archive_grant") | not)] | join(", ")' "$file")
 [ -z "$extra" ] || bad "unknown field(s): $extra"
 
-# Required keys, and every present key must be a string.
-for k in name repo commit author license sdk; do
+# Required keys, and every present key except archive_grant must be a string.
+for k in name repo commit author license sdk archive_grant; do
   has "$k" || bad "missing required field: $k"
 done
 for k in name repo commit subdir title author license sdk homepage; do
@@ -47,6 +54,11 @@ for k in name repo commit subdir title author license sdk homepage; do
     bad "$k must be a string"
   fi
 done
+
+# The grant must be the JSON value true, nothing else.
+if has archive_grant && ! jq -e '.archive_grant == true' "$file" >/dev/null; then
+  bad "archive_grant must be true"
+fi
 
 name=$(field name)
 repo=$(field repo)
@@ -69,7 +81,9 @@ base=$(basename "$file" .json)
 if has name && [ "$name" != "$base" ]; then
   bad "name \"$name\" must equal the file name \"$base\""
 fi
-if has repo && ! [[ $repo =~ ^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
+# file:/// repos exist only for the offline tests of the mirror script.
+if has repo && ! [[ $repo =~ ^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] \
+  && ! { [ "${HATAMOTO_ALLOW_FILE_REPOS:-}" = 1 ] && [[ $repo =~ ^file:///[A-Za-z0-9._/-]+$ ]]; }; then
   bad "repo must be https://github.com/<owner>/<repo>"
 fi
 if has commit && ! [[ $commit =~ ^[0-9a-f]{40}$ ]]; then
@@ -88,8 +102,14 @@ fi
 if has author && ! [[ $author =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,38}$ ]]; then
   bad "author must match ^[A-Za-z0-9][A-Za-z0-9-]{0,38}\$"
 fi
-if has license && [ -z "$license" ]; then
-  bad "license must not be empty"
+if has license; then
+  allowed=0
+  for l in "${licenses[@]}"; do
+    if [ "$license" = "$l" ]; then allowed=1; fi
+  done
+  if [ "$allowed" -eq 0 ]; then
+    bad "license must be one of: ${licenses[*]}"
+  fi
 fi
 if has sdk && [ -z "$sdk" ]; then
   bad "sdk must not be empty"

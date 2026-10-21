@@ -31,6 +31,9 @@ expect_reject bad-repo.json "repo must be https://github.com"
 expect_reject missing-sdk.json "missing required field: sdk"
 expect_reject extra-field.json "unknown field(s): price"
 expect_reject bad-title.json "title must be 1 to 60"
+expect_reject missing-grant.json "missing required field: archive_grant"
+expect_reject bad-grant.json "archive_grant must be true"
+expect_reject bad-license.json "license must be one of"
 
 # name must equal the file name.
 tmp=$(mktemp -d)
@@ -46,6 +49,20 @@ for r in gtm webhooks searchconsole hello; do
   if err=$("$v" "$tmp/$r.json" 2>&1 >/dev/null); then no "reserved name $r rejected"
   elif [[ $err == *"reserved for a first-party plugin"* ]]; then ok "reserved name $r rejected"
   else no "reserved name $r: $err"; fi
+done
+
+# archive_grant must be JSON true; every allowlisted license is accepted.
+for case in '"archive_grant": false' '"archive_grant": null' '"archive_grant": 1'; do
+  jq ". + {$case}" "$f/good.json" > "$tmp/good.json"
+  if "$v" "$tmp/good.json" >/dev/null 2>&1; then no "rejects $case"; else ok "rejects $case"; fi
+done
+for l in MIT Apache-2.0 BSD-2-Clause BSD-3-Clause ISC MPL-2.0 GPL-2.0 GPL-2.0-only GPL-2.0-or-later GPL-3.0 GPL-3.0-only GPL-3.0-or-later LGPL-2.1 LGPL-2.1-only LGPL-2.1-or-later LGPL-3.0 LGPL-3.0-only LGPL-3.0-or-later AGPL-3.0 AGPL-3.0-only AGPL-3.0-or-later; do
+  jq --arg l "$l" '. + {license: $l}' "$f/good.json" > "$tmp/good.json"
+  if "$v" "$tmp/good.json" >/dev/null 2>&1; then ok "accepts license $l"; else no "accepts license $l"; fi
+done
+for l in WTFPL Proprietary "" mit "MIT OR Apache-2.0" AGPL-1.0; do
+  jq --arg l "$l" '. + {license: $l}' "$f/good.json" > "$tmp/good.json"
+  if "$v" "$tmp/good.json" >/dev/null 2>&1; then no "rejects license '$l'"; else ok "rejects license '$l'"; fi
 done
 
 # title: a display name, 1 to 60 characters, no control characters, no leading or trailing space.
@@ -85,6 +102,42 @@ if command -v go >/dev/null; then
 else
   echo "skip gomod tests: go not found"
 fi
+
+# scripts/changed-manifests.sh: selection of manifests to mirror, renames included.
+repo=$PWD
+cm() { (cd "$tmp/cm" && "$repo/scripts/changed-manifests.sh" "$@" | tr '\0' ' '); }
+cg() { git -C "$tmp/cm" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false "$@"; }
+git init -q "$tmp/cm"; mkdir -p "$tmp/cm/manifests/themes" "$tmp/cm/manifests/sub"
+for n in acme-seo keep gone; do jq --arg n "$n" '.name = $n' "$f/good.json" >"$tmp/cm/manifests/$n.json"; done
+for p in schema.json themes/t.json sub/x.json; do echo '{}' >"$tmp/cm/manifests/$p"; done
+cg add -A; cg commit -qm one
+cg mv manifests/acme-seo.json manifests/acme-seo-pro.json
+jq '.name = "acme-seo-pro"' "$tmp/cm/manifests/acme-seo-pro.json" >"$tmp/x" && mv "$tmp/x" "$tmp/cm/manifests/acme-seo-pro.json"
+cg rm -q manifests/gone.json
+echo '{"a":1}' >"$tmp/cm/manifests/schema.json"; echo '{"a":1}' >"$tmp/cm/manifests/themes/t.json"
+jq '.title = "Changed"' "$tmp/cm/manifests/keep.json" >"$tmp/x" && mv "$tmp/x" "$tmp/cm/manifests/keep.json"
+cg add -A; cg commit -qm two
+want="manifests/acme-seo-pro.json manifests/keep.json "
+if [ "$(cm HEAD~1 HEAD)" = "$want" ]; then ok "changed manifests: rename mirrored, delete/schema/themes skipped"; else no "changed manifests: $(cm HEAD~1 HEAD)"; fi
+if [ "$(cm)" = "$want" ]; then ok "all manifests: schema, themes, nested skipped"; else no "all manifests: $(cm)"; fi
+
+# scripts/mirror-rulesets.sh: payloads of the repository rulesets.
+r=scripts/mirror-rulesets.sh
+if "$r" tag | jq -e '.name == "archive-tags" and .target == "tag" and .enforcement == "active"
+  and .conditions.ref_name.include == ["refs/tags/src/*", "refs/tags/v*"]
+  and ([.rules[].type] | sort) == ["deletion", "update"]' >/dev/null; then ok "tag ruleset payload"; else no "tag ruleset payload"; fi
+if "$r" branch | jq -e '.name == "archive-main" and .target == "branch" and .enforcement == "active"
+  and .conditions.ref_name.include == ["refs/heads/main"]
+  and ([.rules[].type] | sort) == ["deletion", "non_fast_forward"]' >/dev/null; then ok "branch ruleset payload"; else no "branch ruleset payload"; fi
+if "$r" bogus >/dev/null 2>&1; then no "ruleset kind rejected"; else ok "ruleset kind rejected"; fi
+
+# scripts/mirror-plugin.sh: offline fixture mirrors.
+bash tests/mirror.sh
+case $? in
+  0) ok "mirror-plugin.sh tests" ;;
+  77) echo "SKIP mirror-plugin.sh tests (go not found, MIRROR_TESTS_ALLOW_SKIP=1)" ;;
+  *) no "mirror-plugin.sh tests" ;;
+esac
 
 echo "$pass passed, $failed failed"
 [ "$failed" -eq 0 ]

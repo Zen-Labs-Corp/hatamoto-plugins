@@ -5,5 +5,6 @@
   "author": "acme",
   "license": "MIT",
   "sdk": "^0.10",
-  "price": "free"
+  "price": "free",
+  "archive_grant": true
 }
