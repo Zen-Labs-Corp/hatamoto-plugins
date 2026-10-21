@@ -81,7 +81,9 @@ base=$(basename "$file" .json)
 if has name && [ "$name" != "$base" ]; then
   bad "name \"$name\" must equal the file name \"$base\""
 fi
-if has repo && ! [[ $repo =~ ^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
+# file:/// repos exist only for the offline tests of the mirror script.
+if has repo && ! [[ $repo =~ ^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] \
+  && ! { [ "${HATAMOTO_ALLOW_FILE_REPOS:-}" = 1 ] && [[ $repo =~ ^file:///[A-Za-z0-9._/-]+$ ]]; }; then
   bad "repo must be https://github.com/<owner>/<repo>"
 fi
 if has commit && ! [[ $commit =~ ^[0-9a-f]{40}$ ]]; then
