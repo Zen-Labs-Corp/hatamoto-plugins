@@ -49,7 +49,7 @@ Add `manifests/<name>.json`, where `<name>` is the `name` in your `plugin.json`:
 | `commit` | yes | full 40 character lowercase hex commit id |
 | `subdir` | no | plugin folder inside the repo; no `..`, no leading `/` |
 | `title` | no | display name for the directory card, 1 to 60 characters, no control characters, no leading or trailing space; without it the card shows `name` |
-| `author` | yes | your GitHub name, shown as "by @author" |
+| `author` | yes | your GitHub name, shown as "by @author" (the maintainer-only `tier` field, see [manifests/README.md](manifests/README.md), replaces it for first-party plugins and is not available to community authors) |
 | `license` | yes | SPDX id from the allowlist: `MIT`, `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `ISC`, `MPL-2.0`, `GPL-2.0`, `GPL-3.0`, `LGPL-2.1`, `LGPL-3.0`, `AGPL-3.0` (GPL, LGPL and AGPL also as `-only` or `-or-later`) |
 | `archive_grant` | yes | must be `true`: your perpetual, irrevocable grant to archive, build, sign and redistribute the source at the pinned commit and its builds |
 | `sdk` | yes | SDK range you built against; matches `plugin.json` |
@@ -94,7 +94,8 @@ A maintainer reads the source at the pinned commit. We look for:
   behaviour, no data sent anywhere the description does not mention.
 - **License and grant.** The repo has a license file, it matches the manifest and is on the allowlist, and both PR checkboxes (the archive grant and the license) are ticked.
 - **Fit.** The plugin works, has tests, and does not duplicate a first-party
-  plugin without good reason.
+  plugin (for example `gtm` or `searchconsole`) without good reason. The names
+  `gtm`, `searchconsole`, `webhooks` and `hello` cannot be used.
 
 Reviewers may ask for changes. Push fixes to your repo and update `commit` in
 the PR.

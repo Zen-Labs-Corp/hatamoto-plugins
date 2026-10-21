@@ -47,7 +47,8 @@ require github.com/extism/go-pdk v1.1.3 // indirect
 
 ## 2. Lay out the files
 
-Copy the split used by the first-party `gtm` plugin. It keeps the code that only
+Copy the split used by the first-party `gtm` plugin
+(<https://github.com/zenlabscorp/hatamoto-plugin-gtm>). It keeps the code that only
 makes sense inside WebAssembly apart from the code you can unit test on your
 machine:
 
