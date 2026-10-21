@@ -2,7 +2,8 @@
 
 The community plugin registry for [Hatamoto](https://hatamoto.dev). Each file in
 `manifests/` pins one plugin, hosted in its author's own GitHub repo, to an exact
-commit. A merged manifest means the plugin is approved: the Hatamoto team builds
+commit. First-party plugins (`gtm`, `searchconsole`) are listed the same way, from
+repos under `github.com/zenlabscorp/`, with `tier: first-party` instead of an author. A merged manifest means the plugin is approved: the Hatamoto team builds
 it from that commit, signs it with the Hatamoto key and publishes it. At merge a
 copy of the pinned source is also archived in a repo the project owns, so removing
 the author's repo does not remove an approved plugin. The copy is the source at
@@ -12,9 +13,9 @@ is public, and an existing mirror is never re-vendored.
 Approved plugins are listed on <https://hatamoto.dev/plugins> and install with one
 click from Admin > Plugins > Browse registry.
 
-> **Status:** the Hatamoto SDK (`hatamoto.dev/sdk`) becomes fetchable when Hatamoto
-> core goes public. Submissions open at that time. Until then you can read the
-> guides, but plugins cannot yet be built outside the core repository.
+> **Status:** the Hatamoto SDK (`hatamoto.dev/sdk`) is public at
+> <https://github.com/zenlabscorp/hatamoto-sdk>, so plugins build outside the core
+> repository today. Community submissions open when Hatamoto core goes public.
 
 ## Guides
 
