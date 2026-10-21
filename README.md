@@ -37,7 +37,7 @@ scripts/validate-manifest.sh manifests/acme-seo.json --remote
 `.github/workflows/mirror.yml` needs this once:
 
 - **Token.** A fine-grained personal access token, resource owner
-  `hatamoto-plugins-archive`, Repository access: All repositories, permissions
+  `Zen-Labs-Corp`, Repository access: All repositories, permissions
   Administration (read and write) and Contents (read and write). If the
   organization requires approval for fine-grained tokens, approve it in the
   organization settings. Give it an expiry and rotate it before it lapses.

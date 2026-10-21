@@ -43,7 +43,7 @@ jobs:
         env:
           GOTOOLCHAIN: go1.27.3
           GOWORK: 'off'
-          MIRROR_ORG: ${{ vars.MIRROR_ORG || 'hatamoto-plugins-archive' }}
+          MIRROR_ORG: ${{ vars.MIRROR_ORG || 'Zen-Labs-Corp' }}
           SDK_PUBLIC: ${{ vars.SDK_PUBLIC }}
           GH_TOKEN: ${{ secrets.MIRROR_TOKEN }}
           EVENT: ${{ github.event_name }}

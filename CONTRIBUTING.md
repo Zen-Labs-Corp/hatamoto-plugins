@@ -16,7 +16,7 @@ one click from Admin > Plugins > Browse registry. To write one first, read
 4. A merge is the approval. CI copies the source at your pinned commit into a
    repo owned by the Hatamoto project (vendored Go dependencies are added only when
    the SDK is public; the source copy is what matters): a copy is kept at `github.com/<archive>/<name>` (the archive organization is
-   `hatamoto-plugins-archive`). The release manager builds from that copy, signs
+   `Zen-Labs-Corp`). The release manager builds from that copy, signs
    the result with the Hatamoto key and publishes it.
 
 We never accept binaries. Everything is built from the source you pinned. By
