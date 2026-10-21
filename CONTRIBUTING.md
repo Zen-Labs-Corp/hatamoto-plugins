@@ -112,3 +112,16 @@ Open a PR that deletes your manifest. After it merges the release manager
 publishes an index without the plugin. Copies already installed keep working until
 each site owner removes them. If a plugin is found to be harmful, maintainers may
 remove its manifest without notice and publish immediately.
+
+## Sign your commits (DCO)
+
+Every commit in a pull request must carry a `Signed-off-by: Your Name <you@example.com>`
+trailer whose email matches the commit author, certifying the
+[Developer Certificate of Origin](https://developercertificate.org/). Use
+`git commit -s`; fix existing commits with `git rebase --signoff origin/main`.
+CI runs `scripts/check-dco.sh` and fails the pull request without it.
+
+## Security and conduct
+
+Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
