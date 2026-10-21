@@ -2,10 +2,12 @@
 # we own, so deleting the author's repository cannot remove an approved plugin.
 # See scripts/mirror-plugin.sh.
 #
-# Runs only on a push to main (after review and merge) or by hand, never on a pull
-# request. The token lives in the protected environment `plugin-mirror` (restrict
-# it to the main branch): the repository secret MIRROR_TOKEN, a fine-grained token
-# owned by the archive organization with Administration + Contents write. The
+# Runs only on a push to main (after review and merge) or by hand on main, never
+# on a pull request. The token is the ENVIRONMENT secret MIRROR_TOKEN of the
+# environment `plugin-mirror` (deployment branches: main only), not a repository
+# secret: a fine-grained token owned by the archive organization with
+# Administration + Contents read/write. mirror-plugin.sh hands it only to the gh
+# create call and the push, never to a fetch of upstream code or go mod vendor. The
 # variable MIRROR_ORG names that organization; SDK_PUBLIC=true turns on go mod
 # vendor once the SDK is fetchable. The job runs no plugin code and never signs.
 name: mirror
@@ -26,6 +28,7 @@ concurrency:
 
 jobs:
   mirror:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: plugin-mirror
     steps:
