@@ -58,18 +58,9 @@ jobs:
             && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
             all=0
           fi
-          if [ "$all" -eq 1 ]; then
-            list() { git ls-files -z -- 'manifests/*.json'; }
-          else
-            list() { git diff -z --name-only --diff-filter=AM "$BEFORE" "$SHA" -- 'manifests/*.json'; }
-          fi
           status=0
           while IFS= read -r -d '' f; do
-            case "$f" in
-              manifests/schema.json | manifests/themes/*) continue ;;
-              manifests/*/*) continue ;;
-            esac
             echo "mirroring $f"
             scripts/mirror-plugin.sh "$f" || status=1
-          done < <(list)
+          done < <(if [ "$all" -eq 1 ]; then scripts/changed-manifests.sh; else scripts/changed-manifests.sh "$BEFORE" "$SHA"; fi)
           exit "$status"
