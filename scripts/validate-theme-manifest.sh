@@ -3,10 +3,46 @@
 #
 # The rules mirror schemas/theme-manifest.schema.json and the registry build
 # (keep them in sync). --remote (CI) also fetches the source and checks that
-# theme.json carries the manifest name and that any screenshot is <= 2 MiB.
-# If HATAMOTO_BIN is set, the Go validator (`theme check --registry`) also runs.
+# theme.json carries the manifest name and a screenshot under assets/ of <= 2 MiB.
+# If HATAMOTO_BIN is set, the Go validator (`theme check ... --registry`) also runs.
 # Manifest values are only ever passed as quoted arguments, never evaluated.
 set -euo pipefail
+# Title length counts characters, not bytes.
+if locale -a 2>/dev/null | grep -qix 'C\.utf-\?8'; then
+  export LC_ALL=C.UTF-8
+elif loc=$(locale -a 2>/dev/null | grep -iE '^en_US\.utf-?8$' | head -n1) && [ -n "$loc" ]; then
+  export LC_ALL=$loc
+elif loc=$(locale -a 2>/dev/null | grep -iE '\.utf-?8$' | head -n1) && [ -n "$loc" ]; then
+  export LC_ALL=$loc
+else
+  echo "warning: no UTF-8 locale found; title length may be counted in bytes" >&2
+fi
+
+# License allowlist (SPDX ids); keep in sync with scripts/validate-manifest.sh,
+# manifests/schema.json and the registry build script (tests/run-themes.sh
+# asserts this array equals the one in validate-manifest.sh).
+licenses=(MIT Apache-2.0 BSD-2-Clause BSD-3-Clause ISC MPL-2.0)
+for l in GPL-2.0 GPL-3.0 LGPL-2.1 LGPL-3.0 AGPL-3.0; do
+  licenses+=("$l" "$l-only" "$l-or-later")
+done
+
+# host_ok <url>: public DNS name only. No IP literal, localhost, single label,
+# internal suffix, port or credentials. Keep in sync with the registry build script.
+host_ok() {
+  local h=${1#https://}
+  h=${h%%/*}
+  h=$(printf '%s' "$h" | tr '[:upper:]' '[:lower:]')
+  case $h in
+    ''|*@*|*:*|*\[*|*\]*) return 1 ;;
+    localhost|*.localhost|*.local|*.internal|*.lan|*.home|*.corp|*.test|*.invalid) return 1 ;;
+  esac
+  [[ $h =~ ^[0-9.]+$ ]] && return 1
+  [[ $h == *.* ]] || return 1
+  return 0
+}
+
+# unzip_escape <name>: unzip treats member names as wildcard patterns; escape them.
+unzip_escape() { printf '%s' "$1" | sed 's/[][*?\\]/\\&/g'; }
 
 usage() { echo "usage: $0 <manifest.json> [--remote]" >&2; exit 2; }
 
@@ -30,17 +66,22 @@ fi
 field() { jq -r --arg k "$1" 'if (.[$k] | type) == "string" then .[$k] else "" end' "$file"; }
 has() { jq -e --arg k "$1" 'has($k)' "$file" >/dev/null; }
 
-extra=$(jq -r '[keys[] | select(IN("name","author","license","homepage","subdir","repo","commit","archive","sha256") | not)] | join(", ")' "$file")
+extra=$(jq -r '[keys[] | select(IN("name","author","license","homepage","subdir","repo","commit","archive","sha256","title","archive_grant") | not)] | join(", ")' "$file")
 [ -z "$extra" ] || bad "unknown field(s): $extra"
 
-for k in name author license; do
+for k in name author license archive_grant; do
   has "$k" || bad "missing required field: $k"
 done
-for k in name author license homepage subdir repo commit archive sha256; do
+for k in name author license title homepage subdir repo commit archive sha256; do
   if has "$k" && ! jq -e --arg k "$k" '.[$k] | type == "string"' "$file" >/dev/null; then
     bad "$k must be a string"
   fi
 done
+
+# The grant must be the JSON value true, nothing else.
+if has archive_grant && ! jq -e '.archive_grant == true' "$file" >/dev/null; then
+  bad "archive_grant must be true"
+fi
 
 name=$(field name)
 author=$(field author)
@@ -51,14 +92,20 @@ repo=$(field repo)
 commit=$(field commit)
 archive=$(field archive)
 sha256=$(field sha256)
+title=$(field title)
 
-url_re='^https://[A-Za-z0-9.-]+(:[0-9]+)?/[^[:space:]@]+$'
+url_re='^https://([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}/[^[:space:]@]+$'
+# file:// sources exist only for the offline tests (same hooks as the mirror and the builder).
+repo_ok() { { [[ $1 =~ $url_re ]] && host_ok "$1"; } || { [ "${HATAMOTO_ALLOW_FILE_REPOS:-}" = 1 ] && [[ $1 =~ ^file:///[A-Za-z0-9._/-]+$ ]]; }; }
+archive_ok() { { [[ $1 =~ $url_re ]] && host_ok "$1"; } || { [ "${HATAMOTO_ALLOW_FILE_ARCHIVES:-}" = 1 ] && [[ $1 =~ ^file:///[A-Za-z0-9._/-]+\.zip$ ]]; }; }
 
 if has name && ! [[ $name =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
   bad "name must match ^[a-z][a-z0-9-]{1,39}\$"
 fi
-if has name && [ "$name" = "default" ]; then
-  bad "name \"default\" is reserved"
+if has name; then
+  for reserved in default webhooks hello gtm searchconsole; do
+    [ "$name" != "$reserved" ] || bad "name \"$name\" is reserved"
+  done
 fi
 base=$(basename "$file" .json)
 if has name && [ "$name" != "$base" ]; then
@@ -67,8 +114,19 @@ fi
 if has author && ! [[ $author =~ ^[A-Za-z0-9][A-Za-z0-9\ ._@-]{0,60}$ ]]; then
   bad "author must match ^[A-Za-z0-9][A-Za-z0-9 ._@-]{0,60}\$"
 fi
-if has license && [ -z "$license" ]; then
-  bad "license must not be empty"
+if has license; then
+  allowed=0
+  for l in "${licenses[@]}"; do
+    if [ "$license" = "$l" ]; then allowed=1; fi
+  done
+  if [ "$allowed" -eq 0 ]; then
+    bad "license must be one of: ${licenses[*]}"
+  fi
+fi
+if has title; then
+  if [ -z "$title" ] || [ "${#title}" -gt 60 ] || [[ $title =~ [[:cntrl:]] ]] || [[ $title == " "* ]] || [[ $title == *" " ]]; then
+    bad "title must be 1 to 60 characters, no control characters, no leading or trailing space"
+  fi
 fi
 if has homepage && ! [[ $homepage =~ ^https:// ]]; then
   bad "homepage must start with https://"
@@ -90,8 +148,8 @@ elif [ "$git_src" -eq 0 ] && [ "$arc_src" -eq 0 ]; then
 elif [ "$git_src" -eq 1 ]; then
   has repo || bad "missing required field: repo"
   has commit || bad "missing required field: commit"
-  if has repo && ! [[ $repo =~ $url_re ]]; then
-    bad "repo must be an https:// URL without credentials"
+  if has repo && ! repo_ok "$repo"; then
+    bad "repo must be an https:// URL on a public host name (no IP, localhost, port or credentials)"
   fi
   if has commit && ! [[ $commit =~ ^[0-9a-f]{40}$ ]]; then
     bad "commit must be 40 lowercase hex characters"
@@ -100,8 +158,8 @@ else
   has archive || bad "missing required field: archive"
   has sha256 || bad "missing required field: sha256"
   has subdir && bad "subdir is not allowed with an archive source"
-  if has archive && ! [[ $archive =~ $url_re ]]; then
-    bad "archive must be an https:// URL without credentials"
+  if has archive && ! archive_ok "$archive"; then
+    bad "archive must be an https:// URL on a public host name (no IP, localhost, port or credentials)"
   fi
   if has sha256 && ! [[ $sha256 =~ ^[a-f0-9]{64}$ ]]; then
     bad "sha256 must be 64 lowercase hex characters"
@@ -128,27 +186,36 @@ if [ "$remote" -eq 1 ]; then
   tj=""
   shot_size=""
   if [ -n "$repo" ]; then
-    case $repo in file://*) [ "${HATAMOTO_ALLOW_FILE_REPOS:-}" = 1 ] || { echo "$file: file:// repos are not allowed" >&2; exit 1; } ;; esac
-    git -C "$tmp" init -q
-    if ! git -C "$tmp" fetch -q --depth 1 "$repo" "$commit" 2>/dev/null; then
+    co="$tmp/co"
+    mkdir "$co"
+    git -C "$co" init -q
+    if ! git -C "$co" fetch -q --depth 1 "$repo" "$commit" 2>/dev/null; then
       echo "$file: commit $commit not found in $repo" >&2
       exit 1
     fi
     prefix=""
     [ -z "$subdir" ] || prefix="${subdir%/}/"
-    if ! tj=$(git -C "$tmp" show "FETCH_HEAD:${prefix}theme.json" 2>/dev/null); then
+    if ! tj=$(git -C "$co" show "FETCH_HEAD:${prefix}theme.json" 2>/dev/null); then
       echo "$file: no ${prefix}theme.json at commit $commit" >&2
       exit 1
     fi
-    shot=$(printf '%s' "$tj" | jq -r '.screenshot // empty' 2>/dev/null || true)
-    if [ -n "$shot" ]; then
-      if ! shot_size=$(git -C "$tmp" cat-file -s "FETCH_HEAD:${prefix}${shot}" 2>/dev/null); then
-        echo "$file: screenshot $shot not found" >&2
-        exit 1
-      fi
+    shot=$(printf '%s' "$tj" | jq -er '.screenshot | strings' 2>/dev/null || true)
+    if [ -z "$shot" ]; then
+      echo "$file: theme.json has no screenshot (required)" >&2
+      exit 1
+    fi
+    if ! [[ $shot == assets/* ]] || [[ $shot =~ (^|/)\.\.(/|$) ]]; then
+      echo "$file: screenshot $shot must be under assets/" >&2
+      exit 1
+    fi
+    if ! shot_size=$(git -C "$co" cat-file -s "FETCH_HEAD:${prefix}${shot}" 2>/dev/null); then
+      echo "$file: screenshot $shot not found" >&2
+      exit 1
     fi
   else
-    if ! curl --proto '=https' --max-redirs 3 --max-filesize 20971520 --max-time 60 -fsSL -o "$tmp/a.zip" "$archive"; then
+    protos='=https'
+    case $archive in file://*) protos='=file' ;; esac
+    if ! curl --proto "$protos" --proto-redir '=https' --max-redirs 5 --max-filesize 67108864 --max-time 60 -fsSL -o "$tmp/a.zip" "$archive"; then
       echo "$file: cannot download $archive" >&2
       exit 1
     fi
@@ -163,12 +230,35 @@ if [ "$remote" -eq 1 ]; then
       echo "$file: no theme.json in archive" >&2
       exit 1
     fi
-    tj=$(unzip -p "$tmp/a.zip" "$tpath")
-    shot=$(printf '%s' "$tj" | jq -r '.screenshot // empty' 2>/dev/null || true)
-    if [ -n "$shot" ]; then
-      wrap="${tpath%theme.json}"
-      shot_size=$(unzip -l "$tmp/a.zip" "${wrap}${shot}" 2>/dev/null | awk 'END{ if (NR > 0) print $1 }')
-      [[ $shot_size =~ ^[0-9]+$ ]] || { echo "$file: screenshot $shot not found in archive" >&2; exit 1; }
+    tj=$(unzip -p "$tmp/a.zip" "$(unzip_escape "$tpath")")
+    shot=$(printf '%s' "$tj" | jq -er '.screenshot | strings' 2>/dev/null || true)
+    if [ -z "$shot" ]; then
+      echo "$file: theme.json has no screenshot (required)" >&2
+      exit 1
+    fi
+    if ! [[ $shot == assets/* ]] || [[ $shot =~ (^|/)\.\.(/|$) ]]; then
+      echo "$file: screenshot $shot must be under assets/" >&2
+      exit 1
+    fi
+    if [[ $shot == *[\*\?\[\]\\]* ]]; then
+      echo "$file: screenshot $shot must not contain wildcard characters (* ? [ ] \\)" >&2
+      exit 1
+    fi
+    wrap="${tpath%theme.json}"
+    # Capture the listing first: grep -q exiting early would SIGPIPE unzip (pipefail).
+    list=$(unzip -Z1 "$tmp/a.zip")
+    if ! grep -Fxq -- "${wrap}${shot}" <<<"$list"; then
+      echo "$file: screenshot ${wrap}${shot} declared in theme.json not found in archive" >&2
+      exit 1
+    fi
+    # Size comes from the zip listing (uncompressed size), never by inflating.
+    zlist=$(unzip -Zl "$tmp/a.zip")
+    shot_size=$(awk -v want="${wrap}${shot}" '
+      { n = $0; for (i = 0; i < 9; i++) sub(/^ *[^ ]+ +/, "", n) }
+      n == want && $1 !~ /^d/ { print $4; exit }' <<<"$zlist")
+    if ! [[ $shot_size =~ ^[0-9]+$ ]]; then
+      echo "$file: cannot read size of screenshot ${wrap}${shot} from archive" >&2
+      exit 1
     fi
   fi
   tname=$(printf '%s' "$tj" | jq -r '.name // empty' 2>/dev/null || true)
@@ -176,15 +266,16 @@ if [ "$remote" -eq 1 ]; then
     echo "$file: theme.json name \"$tname\" does not match manifest name \"$name\"" >&2
     exit 1
   fi
-  if [ -n "$shot_size" ] && [ "$shot_size" -gt "$max_shot" ]; then
+  if [ "$shot_size" -gt "$max_shot" ]; then
     echo "$file: screenshot is $shot_size bytes, limit is $max_shot" >&2
     exit 1
   fi
   if [ -n "${HATAMOTO_BIN:-}" ]; then
     if [ -n "$repo" ]; then
-      "$HATAMOTO_BIN" theme check --registry --expect-name "$name" --repo "$repo" --commit "$commit" ${subdir:+--subdir "$subdir"}
+      git -C "$co" checkout -q FETCH_HEAD
+      "$HATAMOTO_BIN" theme check "$co/${subdir%/}" --registry --expect-name "$name"
     else
-      "$HATAMOTO_BIN" theme check --registry --expect-name "$name" --archive "$archive" --sha256 "$sha256"
+      "$HATAMOTO_BIN" theme check --archive "$tmp/a.zip" --sha256 "$sha256" --registry --expect-name "$name"
     fi
   fi
 fi

@@ -13,9 +13,22 @@ is public, and an existing mirror is never re-vendored.
 Approved plugins are listed on <https://hatamoto.dev/plugins> and install with one
 click from Admin > Plugins > Browse registry.
 
+## Themes
+
+Themes are submitted the same way, as `manifests/themes/<name>.json`, and are
+reviewed, repacked, signed and archived by the Hatamoto team. They are not
+mirrored and need no SDK. Approved themes are listed on
+<https://hatamoto.dev/themes>.
+
+- [WRITING-THEMES.md](WRITING-THEMES.md): write a theme.
+- [CONTRIBUTING-THEMES.md](CONTRIBUTING-THEMES.md): submit, update or remove one.
+- [manifests/themes/README.md](manifests/themes/README.md) and [schemas/theme-manifest.schema.json](schemas/theme-manifest.schema.json): the theme manifest format.
+- Open a theme pull request with the theme template:
+  `https://github.com/zenlabscorp/hatamoto-plugins/compare/main...your-branch?template=theme.md`
+
 > **Status:** the Hatamoto SDK (`hatamoto.dev/sdk`) is public at
 > <https://github.com/zenlabscorp/hatamoto-sdk>, so plugins build outside the core
-> repository today. Community submissions open when Hatamoto core goes public.
+> repository today. Community submissions, for plugins and themes, open when Hatamoto core goes public.
 
 ## Guides
 
@@ -25,12 +38,14 @@ click from Admin > Plugins > Browse registry.
 
 ## Checks
 
-Every pull request that touches `manifests/` runs `.github/workflows/validate.yml`.
+Every pull request that touches `manifests/`, `scripts/`, `schemas/` or `tests/` runs `.github/workflows/validate.yml`.
 Run the same checks locally:
 
 ```sh
-bash tests/run.sh                         # validator self-test
+bash tests/run.sh                         # validator self-test (includes run-themes.sh)
+bash tests/run-themes.sh                  # theme validator self-test only
 scripts/validate-manifest.sh manifests/acme-seo.json --remote
+scripts/validate-theme-manifest.sh manifests/themes/acme-dark.json --remote
 ```
 
 ## Maintainer setup for the mirror

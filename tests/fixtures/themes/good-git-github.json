@@ -1,1 +1,1 @@
-{"name":"good-git-github","repo":"https://github.com/tanaka/kumo","commit":"0123456789abcdef0123456789abcdef01234567","author":"tanaka","license":"MIT","subdir":"themes/kumo","homepage":"https://example.com"}
+{"name":"good-git-github","repo":"https://github.com/tanaka/kumo","commit":"0123456789abcdef0123456789abcdef01234567","author":"tanaka","license":"MIT","subdir":"themes/kumo","homepage":"https://example.com","archive_grant":true}

@@ -1,1 +1,1 @@
-{"name":"good-archive","archive":"https://example.com/kumo-1.0.0.zip","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","author":"Tanaka Hanako","license":"MIT"}
+{"name":"good-archive","archive":"https://example.com/kumo-1.0.0.zip","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","author":"Tanaka Hanako","license":"MIT","archive_grant":true}
