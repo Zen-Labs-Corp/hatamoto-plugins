@@ -120,6 +120,12 @@ base=$(basename "$file" .json)
 if has name && [ "$name" != "$base" ]; then
   bad "name \"$name\" must equal the file name \"$base\""
 fi
+# Cross-kind uniqueness: a theme manifest in the same manifests/ directory.
+# (Themes enforce the other direction in scripts/validate-theme-manifest.sh.)
+mdir=$(cd "$(dirname "$file")" && pwd)
+if has name && [ -e "$mdir/themes/$name.json" ]; then
+  bad "name \"$name\" is also a theme (manifests/themes/$name.json)"
+fi
 # file:/// repos exist only for the offline tests of the mirror script.
 if has repo && ! [[ $repo =~ ^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] \
   && ! { [ "${HATAMOTO_ALLOW_FILE_REPOS:-}" = 1 ] && [[ $repo =~ ^file:///[A-Za-z0-9._/-]+$ ]]; }; then

@@ -1,0 +1,8 @@
+{
+  "name": "bad-ip-host",
+  "repo": "https://192.168.1.5/tanaka/kumo",
+  "commit": "0123456789abcdef0123456789abcdef01234567",
+  "author": "tanaka",
+  "license": "MIT",
+  "archive_grant": true
+}
