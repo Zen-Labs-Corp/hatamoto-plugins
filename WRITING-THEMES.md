@@ -78,8 +78,9 @@ package format allows (`docs/PACKAGES.md`).
 
 ## 3. Make the screenshot
 
-The directory card and the Browse registry list show your screenshot, so it has
-to be a real picture of your theme. The rules, checked by `hatamoto theme check`:
+The directory card shows your screenshot, so it has to be a real picture of
+your theme. Only `hatamoto theme check --registry` (and the registry build)
+checks the screenshot. The rules:
 
 - A file under `assets/`, named in `theme.json` as `screenshot`.
 - PNG, WebP or JPEG (`.png`, `.webp`, `.jpg`, `.jpeg`), and the contents must
