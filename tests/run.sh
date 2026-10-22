@@ -213,5 +213,8 @@ case $? in
   *) no "mirror-plugin.sh tests" ;;
 esac
 
+# tests/run-themes.sh: theme manifest validator tests (a failure here fails this suite).
+if bash tests/run-themes.sh; then ok "run-themes.sh tests"; else no "run-themes.sh tests"; fi
+
 echo "$pass passed, $failed failed"
 [ "$failed" -eq 0 ]

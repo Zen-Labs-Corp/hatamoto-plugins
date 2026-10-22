@@ -1,7 +1,9 @@
-# Validates manifests in pull requests. No secrets, no signing: publishing is done
-# by the Hatamoto release manager, never by CI.
+# Validates plugin and theme manifests in pull requests (manifests/<name>.json and
+# manifests/themes/<name>.json) and runs the validator self-tests, including the
+# theme tests. No secrets, no signing: publishing is done by the Hatamoto release
+# manager, never by CI.
 #
-# The `build` job compiles each changed plugin at its pinned commit. It needs the
+# The `build` job compiles each changed plugin (themes have no build and no SDK) at its pinned commit. It needs the
 # public Hatamoto SDK (hatamoto.dev/sdk); it runs only when the repository variable
 # SDK_PUBLIC is 'true', which is set once the SDK repository is published.
 name: validate
@@ -11,6 +13,8 @@ on:
     paths:
       - 'manifests/**'
       - 'scripts/**'
+      - 'schemas/**'
+      - 'tests/**'
 
 permissions:
   contents: read
@@ -27,6 +31,8 @@ jobs:
         run: python3 -m pip install --user 'jsonschema==4.23.0'
       - name: Self-test the validator
         run: bash tests/run.sh
+      - name: Self-test the theme validator
+        run: bash tests/run-themes.sh
       - name: Validate changed manifests
         env:
           BASE_REF: ${{ github.base_ref }}
