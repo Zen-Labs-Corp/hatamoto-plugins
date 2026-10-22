@@ -7,6 +7,8 @@
 # If HATAMOTO_BIN is set, the Go validator (`theme check ... --registry`) also runs.
 # Manifest values are only ever passed as quoted arguments, never evaluated.
 set -euo pipefail
+# Title length counts characters, not bytes.
+export LC_ALL=C.UTF-8
 
 # License allowlist (SPDX ids); keep in sync with scripts/validate-manifest.sh,
 # manifests/schema.json and the registry build script (tests/run-themes.sh
@@ -30,6 +32,9 @@ host_ok() {
   [[ $h == *.* ]] || return 1
   return 0
 }
+
+# unzip_escape <name>: unzip treats member names as wildcard patterns; escape them.
+unzip_escape() { printf '%s' "$1" | sed 's/[][*?\\]/\\&/g'; }
 
 usage() { echo "usage: $0 <manifest.json> [--remote]" >&2; exit 2; }
 
@@ -202,7 +207,7 @@ if [ "$remote" -eq 1 ]; then
   else
     protos='=https'
     case $archive in file://*) protos='=file' ;; esac
-    if ! curl --proto "$protos" --proto-redir '=https' --max-redirs 5 --max-filesize 20971520 --max-time 60 -fsSL -o "$tmp/a.zip" "$archive"; then
+    if ! curl --proto "$protos" --proto-redir '=https' --max-redirs 5 --max-filesize 67108864 --max-time 60 -fsSL -o "$tmp/a.zip" "$archive"; then
       echo "$file: cannot download $archive" >&2
       exit 1
     fi
@@ -217,7 +222,7 @@ if [ "$remote" -eq 1 ]; then
       echo "$file: no theme.json in archive" >&2
       exit 1
     fi
-    tj=$(unzip -p "$tmp/a.zip" "$tpath")
+    tj=$(unzip -p "$tmp/a.zip" "$(unzip_escape "$tpath")")
     shot=$(printf '%s' "$tj" | jq -er '.screenshot | strings' 2>/dev/null || true)
     if [ -z "$shot" ]; then
       echo "$file: theme.json has no screenshot (required)" >&2
@@ -227,9 +232,16 @@ if [ "$remote" -eq 1 ]; then
       echo "$file: screenshot $shot must be under assets/" >&2
       exit 1
     fi
+    if [[ $shot == *[\*\?\[\]\\]* ]]; then
+      echo "$file: screenshot $shot must not contain wildcard characters (* ? [ ] \\)" >&2
+      exit 1
+    fi
     wrap="${tpath%theme.json}"
-    shot_size=$(unzip -l "$tmp/a.zip" "${wrap}${shot}" 2>/dev/null | awk 'END{ if (NR > 0) print $1 }')
-    [[ $shot_size =~ ^[0-9]+$ ]] || { echo "$file: screenshot $shot not found in archive" >&2; exit 1; }
+    if ! unzip -Z1 "$tmp/a.zip" | grep -Fxq -- "${wrap}${shot}"; then
+      echo "$file: screenshot ${wrap}${shot} declared in theme.json not found in archive" >&2
+      exit 1
+    fi
+    shot_size=$(unzip -p "$tmp/a.zip" "$(unzip_escape "${wrap}${shot}")" | wc -c)
   fi
   tname=$(printf '%s' "$tj" | jq -r '.name // empty' 2>/dev/null || true)
   if [ "$tname" != "$name" ]; then
