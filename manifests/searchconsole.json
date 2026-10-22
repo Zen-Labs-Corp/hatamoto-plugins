@@ -1,7 +1,7 @@
 {
   "name": "searchconsole",
   "repo": "https://github.com/zenlabscorp/hatamoto-plugin-searchconsole",
-  "commit": "aba9d818221f42e55d0f53b5473ee47b26c57988",
+  "commit": "20df8b907cfcfc3481ca10c072e15fcad06076e7",
   "title": "Google Search Console",
   "license": "Apache-2.0",
   "sdk": "^0.8",
