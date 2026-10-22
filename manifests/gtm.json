@@ -1,7 +1,7 @@
 {
   "name": "gtm",
   "repo": "https://github.com/zenlabscorp/hatamoto-plugin-gtm",
-  "commit": "b115c0bcf80fba3296dd66c7e867f4131b0b787c",
+  "commit": "6b5ee80c2c258dbaf13b46d043cdf0e2f6181dda",
   "title": "Google Tag Manager",
   "license": "Apache-2.0",
   "sdk": "^0.8",
