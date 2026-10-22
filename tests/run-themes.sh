@@ -72,6 +72,12 @@ mutate "single label host" '.repo = "https://intranet/tanaka/kumo"' "public host
 mutate "ipv6 host" '.repo = "https://[::1]/tanaka/kumo"' "public host name"
 mutate "gtm name" '.name = "gtm"' "is reserved"
 mutate "numeric author" '.author = 5' "author must be a string"
+# Title length counts characters even under the C locale.
+for n in 25 60; do
+  jq --arg t "$(printf '\u65e5%.0s' $(seq "$n"))" '. + {title: $t}' "$f/good-git-codeberg.json" > "$tmp/good-git-codeberg.json"
+  if LC_ALL=C "$v" "$tmp/good-git-codeberg.json" >/dev/null 2>&1; then ok "CJK title of $n chars accepted (LC_ALL=C)"; else no "CJK title of $n chars accepted (LC_ALL=C)"; fi
+done
+mutate "61-char CJK title" '. + {title: ("\u65e5" * 61)}' "title must be"
 jq '. + {subdir: "themes/kumo"}' "$f/good-git-codeberg.json" > "$tmp/good-git-codeberg.json"
 if "$v" "$tmp/good-git-codeberg.json" >/dev/null 2>&1; then ok "accepts nested subdir"; else no "accepts nested subdir"; fi
 
@@ -150,6 +156,32 @@ if command -v zip >/dev/null 2>&1; then
   if err=$("$v" "$tmp/rm/manifests/themes/remzip.json" --remote 2>&1 >/dev/null); then no "remote archive sha mismatch rejected"
   elif [[ $err == *"sha256 mismatch"* ]]; then ok "remote archive sha mismatch rejected"
   else no "remote archive sha mismatch: $err"; fi
+  # Missing declared screenshot: clear error.
+  mk_repo "$tmp/zns" 0 remzns
+  (cd "$tmp/zns" && zip -qr "$tmp/remzns.zip" theme.json)
+  zns=$(sha256sum "$tmp/remzns.zip" | cut -d' ' -f1)
+  remote_manifest remzns --argjson extra "{\"archive\":\"file://$tmp/remzns.zip\",\"sha256\":\"$zns\"}"
+  if err=$("$v" "$tmp/rm/manifests/themes/remzns.json" --remote 2>&1 >/dev/null); then no "archive missing screenshot rejected"
+  elif [[ $err == *"screenshot assets/s.png declared in theme.json not found in archive"* ]]; then ok "archive missing screenshot rejected"
+  else no "archive missing screenshot: $err"; fi
+  # Wildcard names are matched literally, never as patterns.
+  mk_repo "$tmp/zwild" 1 remzwild
+  printf '{"name":"remzwild","screenshot":"assets/*"}' > "$tmp/zwild/theme.json"
+  (cd "$tmp/zwild" && zip -qr "$tmp/remzwild.zip" theme.json assets)
+  zw=$(sha256sum "$tmp/remzwild.zip" | cut -d' ' -f1)
+  remote_manifest remzwild --argjson extra "{\"archive\":\"file://$tmp/remzwild.zip\",\"sha256\":\"$zw\"}"
+  if err=$("$v" "$tmp/rm/manifests/themes/remzwild.json" --remote 2>&1 >/dev/null); then no "wildcard screenshot rejected"
+  elif [[ $err == *"wildcard"* ]]; then ok "wildcard screenshot rejected"
+  else no "wildcard screenshot: $err"; fi
+  # A decoy */theme.json-style wrapper name must not match other entries.
+  mkdir -p "$tmp/zwrap/w[a]/assets" "$tmp/zwrap/wa/assets"
+  printf '{"name":"remzwrap","screenshot":"assets/s.png"}' > "$tmp/zwrap/w[a]/theme.json"
+  printf 'x' > "$tmp/zwrap/w[a]/assets/s.png"
+  printf '{"name":"decoy","screenshot":"assets/s.png"}' > "$tmp/zwrap/wa/theme.json"
+  (cd "$tmp/zwrap" && zip -qr "$tmp/remzwrap.zip" "w[a]")
+  zr=$(sha256sum "$tmp/remzwrap.zip" | cut -d' ' -f1)
+  remote_manifest remzwrap --argjson extra "{\"archive\":\"file://$tmp/remzwrap.zip\",\"sha256\":\"$zr\"}"
+  if "$v" "$tmp/rm/manifests/themes/remzwrap.json" --remote >/dev/null 2>&1; then ok "wrapper dir with glob chars read literally"; else no "wrapper dir with glob chars read literally"; fi
 else
   echo "SKIP remote archive tests (zip not installed)"
 fi
@@ -160,6 +192,42 @@ if [ -n "${HATAMOTO_BIN:-}" ]; then
   if "$HATAMOTO_BIN" theme check --help >/dev/null 2>&1; then ok "HATAMOTO_BIN theme check available"; else no "HATAMOTO_BIN theme check available"; fi
 else
   echo "SKIP Go-backed archive negatives (HATAMOTO_BIN not set)"
+fi
+
+# schemas/theme-manifest.schema.json agrees with the validator. Needs python3 jsonschema;
+# a missing module fails the suite unless SCHEMA_TESTS_ALLOW_SKIP=1.
+if python3 -c 'import jsonschema' >/dev/null 2>&1; then
+  sv() { python3 - "$1" <<'PY'
+import json, sys, jsonschema
+s = json.load(open("schemas/theme-manifest.schema.json"))
+sys.exit(0 if jsonschema.Draft202012Validator(s).is_valid(json.load(open(sys.argv[1]))) else 1)
+PY
+  }
+  # Fixtures: validator and schema must give the same verdict. The file-name rule
+  # (name == basename) is outside the schema, so compare only on content-level fixtures.
+  for g in good-git-github good-git-codeberg good-archive good-title; do
+    if sv "$f/$g.json"; then ok "schema accepts $g"; else no "schema accepts $g"; fi
+  done
+  for b in bad-http-repo bad-http-archive bad-commit bad-sha256 bad-both-sources bad-no-source bad-extra-field bad-no-grant bad-license bad-reserved default bad-tier; do
+    if sv "$f/$b.json"; then no "schema rejects $b"; else ok "schema rejects $b"; fi
+  done
+  smut() { # <label> <accept|reject> <jq filter>
+    jq "$3" "$f/good-git-codeberg.json" > "$tmp/s.json"
+    if sv "$tmp/s.json"; then [ "$2" = accept ] && ok "schema: $1" || no "schema: $1"
+    else [ "$2" = reject ] && ok "schema: $1" || no "schema: $1"; fi
+  }
+  smut "subdir traversal" reject '. + {subdir: "../x"}'
+  smut "subdir mid traversal" reject '. + {subdir: "a/../x"}'
+  smut "absolute subdir" reject '. + {subdir: "/abs"}'
+  smut "nested subdir" accept '. + {subdir: "themes/kumo"}'
+  smut "dotted subdir name" accept '. + {subdir: "a..b/x"}'
+  smut "plain public repo host" accept '.repo = "https://example.com/a/b"'
+  smut "61-char title" reject '. + {title: ("x" * 61)}'
+  smut "25 CJK title" accept '. + {title: ("\u65e5" * 25)}'
+elif [ "${SCHEMA_TESTS_ALLOW_SKIP:-}" = 1 ]; then
+  echo "skip schema tests: python3 jsonschema not found (SCHEMA_TESTS_ALLOW_SKIP=1)"
+else
+  no "schema tests need python3 jsonschema (set SCHEMA_TESTS_ALLOW_SKIP=1 to skip)"
 fi
 
 echo "$pass passed, $failed failed"

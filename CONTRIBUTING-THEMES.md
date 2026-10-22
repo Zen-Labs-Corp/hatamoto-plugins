@@ -104,7 +104,7 @@ and the other way round.
 
 - It must be a zip file and its sha256 must match the pin. Get the hash with
   `sha256sum theme.zip` (on macOS `shasum -a 256 theme.zip`). The CI check
-  downloads at most 20 MiB, so keep the zip below that.
+  downloads at most 64 MiB, so keep the zip below that.
 - `theme.json` sits at the top of the zip, or inside exactly one wrapper folder
   (what `zip -r` of a folder gives you); that one folder is stripped.
 - It follows the same safety limits as any package: entry count, sizes,
