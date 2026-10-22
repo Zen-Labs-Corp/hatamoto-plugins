@@ -8,7 +8,15 @@
 # Manifest values are only ever passed as quoted arguments, never evaluated.
 set -euo pipefail
 # Title length counts characters, not bytes.
-export LC_ALL=C.UTF-8
+if locale -a 2>/dev/null | grep -qix 'C\.utf-\?8'; then
+  export LC_ALL=C.UTF-8
+elif loc=$(locale -a 2>/dev/null | grep -iE '^en_US\.utf-?8$' | head -n1) && [ -n "$loc" ]; then
+  export LC_ALL=$loc
+elif loc=$(locale -a 2>/dev/null | grep -iE '\.utf-?8$' | head -n1) && [ -n "$loc" ]; then
+  export LC_ALL=$loc
+else
+  echo "warning: no UTF-8 locale found; title length may be counted in bytes" >&2
+fi
 
 # License allowlist (SPDX ids); keep in sync with scripts/validate-manifest.sh,
 # manifests/schema.json and the registry build script (tests/run-themes.sh
@@ -237,11 +245,21 @@ if [ "$remote" -eq 1 ]; then
       exit 1
     fi
     wrap="${tpath%theme.json}"
-    if ! unzip -Z1 "$tmp/a.zip" | grep -Fxq -- "${wrap}${shot}"; then
+    # Capture the listing first: grep -q exiting early would SIGPIPE unzip (pipefail).
+    list=$(unzip -Z1 "$tmp/a.zip")
+    if ! grep -Fxq -- "${wrap}${shot}" <<<"$list"; then
       echo "$file: screenshot ${wrap}${shot} declared in theme.json not found in archive" >&2
       exit 1
     fi
-    shot_size=$(unzip -p "$tmp/a.zip" "$(unzip_escape "${wrap}${shot}")" | wc -c)
+    # Size comes from the zip listing (uncompressed size), never by inflating.
+    zlist=$(unzip -Zl "$tmp/a.zip")
+    shot_size=$(awk -v want="${wrap}${shot}" '
+      { n = $0; for (i = 0; i < 9; i++) sub(/^ *[^ ]+ +/, "", n) }
+      n == want && $1 !~ /^d/ { print $4; exit }' <<<"$zlist")
+    if ! [[ $shot_size =~ ^[0-9]+$ ]]; then
+      echo "$file: cannot read size of screenshot ${wrap}${shot} from archive" >&2
+      exit 1
+    fi
   fi
   tname=$(printf '%s' "$tj" | jq -r '.name // empty' 2>/dev/null || true)
   if [ "$tname" != "$name" ]; then

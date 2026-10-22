@@ -156,6 +156,31 @@ if command -v zip >/dev/null 2>&1; then
   if err=$("$v" "$tmp/rm/manifests/themes/remzip.json" --remote 2>&1 >/dev/null); then no "remote archive sha mismatch rejected"
   elif [[ $err == *"sha256 mismatch"* ]]; then ok "remote archive sha mismatch rejected"
   else no "remote archive sha mismatch: $err"; fi
+  # Large archive, screenshot listed first: must not SIGPIPE into "not found".
+  big_zip() { # <out.zip> <screenshot-bytes>
+    python3 - "$1" "$2" "$png" <<'PY'
+import sys, zipfile
+out, size, png = sys.argv[1], int(sys.argv[2]), sys.argv[3].encode("latin-1")
+with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+    z.writestr("assets/s.png", (png + b"\0" * size)[:max(size, len(png))])
+    z.writestr("theme.json", '{"name":"rembig","screenshot":"assets/s.png"}')
+    for i in range(2000):
+        z.writestr("assets/extra/" + "d" * 80 + "-%04d.txt" % i, "x")
+PY
+  }
+  if command -v python3 >/dev/null 2>&1; then
+    big_zip "$tmp/rembig.zip" 1000
+    bsha=$(sha256sum "$tmp/rembig.zip" | cut -d' ' -f1)
+    remote_manifest rembig --argjson extra "{\"archive\":\"file://$tmp/rembig.zip\",\"sha256\":\"$bsha\"}"
+    if err=$("$v" "$tmp/rm/manifests/themes/rembig.json" --remote 2>&1 >/dev/null); then ok "2000-entry archive, early screenshot accepted"
+    else no "2000-entry archive, early screenshot accepted: $err"; fi
+    big_zip "$tmp/rembig2.zip" $((2 * 1024 * 1024 + 1))
+    bsha=$(sha256sum "$tmp/rembig2.zip" | cut -d' ' -f1)
+    remote_manifest rembig --argjson extra "{\"archive\":\"file://$tmp/rembig2.zip\",\"sha256\":\"$bsha\"}"
+    if err=$("$v" "$tmp/rm/manifests/themes/rembig.json" --remote 2>&1 >/dev/null); then no "oversized screenshot in archive rejected"
+    elif [[ $err == *"limit is"* ]]; then ok "oversized screenshot in archive rejected"
+    else no "oversized screenshot in archive: $err"; fi
+  fi
   # Missing declared screenshot: clear error.
   mk_repo "$tmp/zns" 0 remzns
   (cd "$tmp/zns" && zip -qr "$tmp/remzns.zip" theme.json)
