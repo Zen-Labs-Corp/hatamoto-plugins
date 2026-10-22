@@ -1,0 +1,45 @@
+# Checks that the MIRROR_TOKEN environment secret can do what mirror.yml needs,
+# without mirroring anything: it creates and deletes a throwaway branch in an
+# existing mirror (Contents: write) and reads that repo's rulesets
+# (Administration: read). Run it by hand after creating or rotating the token:
+#   gh workflow run mirror-token-check.yml --repo zenlabscorp/hatamoto-plugins
+name: mirror-token-check
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: "Existing mirror repo name in MIRROR_ORG to test against"
+        required: false
+        default: "gtm"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: plugin-mirror
+    steps:
+      - name: Check the token
+        env:
+          GH_TOKEN: ${{ secrets.MIRROR_TOKEN }}
+          ORG: ${{ vars.MIRROR_ORG || 'Zen-Labs-Corp' }}
+          REPO: ${{ inputs.repo }}
+          RUN: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          test -n "$GH_TOKEN" || { echo "::error::MIRROR_TOKEN is not set on environment plugin-mirror"; exit 1; }
+          case "$REPO" in *[!a-z0-9-]*|'') echo "::error::bad repo name"; exit 1;; esac
+          r="repos/$ORG/$REPO"
+          sha=$(gh api "$r/git/ref/heads/main" -q .object.sha) || { echo "::error::cannot read $ORG/$REPO (wrong resource owner or repository access?)"; exit 1; }
+          ref="heads/token-check/$RUN"
+          gh api -X POST "$r/git/refs" -f ref="refs/$ref" -f sha="$sha" >/dev/null \
+            || { echo "::error::cannot push to $ORG/$REPO: the token needs Contents: Read and write, resource owner $ORG"; exit 1; }
+          gh api -X DELETE "$r/git/refs/$ref" >/dev/null \
+            || { echo "::error::created refs/$ref but cannot delete it; remove it by hand"; exit 1; }
+          echo "contents write: ok"
+          gh api "$r/rulesets" -q 'map(.name) | join(", ")' \
+            || { echo "::error::cannot read rulesets: the token needs Administration: Read and write"; exit 1; }
+          echo "administration: ok"
