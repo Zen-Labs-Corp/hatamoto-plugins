@@ -4,16 +4,18 @@
   "description": "manifests/themes/<name>.json. Keep in sync with scripts/validate-theme-manifest.sh and the registry build.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["name", "author", "license"],
+  "required": ["name", "author", "license", "archive_grant"],
   "properties": {
-    "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,39}$", "not": { "const": "default" } },
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,39}$", "not": { "enum": ["default", "webhooks", "hello", "gtm", "searchconsole"] } },
+    "title": { "type": "string", "minLength": 1, "maxLength": 60, "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f ]([^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u001f\\u007f-\\u009f ])?$" },
     "author": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._@-]{0,60}$" },
-    "license": { "type": "string", "minLength": 1 },
+    "license": { "enum": ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MPL-2.0", "GPL-2.0", "GPL-2.0-only", "GPL-2.0-or-later", "GPL-3.0", "GPL-3.0-only", "GPL-3.0-or-later", "LGPL-2.1", "LGPL-2.1-only", "LGPL-2.1-or-later", "LGPL-3.0", "LGPL-3.0-only", "LGPL-3.0-or-later", "AGPL-3.0", "AGPL-3.0-only", "AGPL-3.0-or-later"] },
+    "archive_grant": { "const": true },
     "homepage": { "type": "string", "pattern": "^https://" },
     "subdir": { "type": "string", "pattern": "^[A-Za-z0-9._/-]+$" },
-    "repo": { "type": "string", "pattern": "^https://[A-Za-z0-9.-]+(:[0-9]+)?/[^\\s@]+$" },
+    "repo": { "type": "string", "pattern": "^https://([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}/[^\\s@]+$" },
     "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-    "archive": { "type": "string", "pattern": "^https://[A-Za-z0-9.-]+(:[0-9]+)?/[^\\s@]+$" },
+    "archive": { "type": "string", "pattern": "^https://([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}/[^\\s@]+$" },
     "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
   },
   "oneOf": [
