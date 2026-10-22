@@ -1,3 +1,5 @@
+Submitting a theme? Use the theme template instead: append `?template=theme.md` to the pull request URL.
+
 ## Plugin
 
 Name: 

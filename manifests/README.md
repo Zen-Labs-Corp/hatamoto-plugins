@@ -1,8 +1,11 @@
 # Manifests
 
 One file per plugin: `manifests/<name>.json`, where `<name>` equals the `name` in
-the plugin's own `plugin.json`. This directory stays empty until submissions open
+the plugin's own `plugin.json`. Submissions are not open yet
 (see the status note in the top-level README).
+
+Themes live in [themes/](themes/README.md), one `manifests/themes/<name>.json` each,
+with their own format and checks.
 
 ```json
 {
