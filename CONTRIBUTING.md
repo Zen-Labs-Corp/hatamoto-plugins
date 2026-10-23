@@ -52,7 +52,7 @@ Add `manifests/<name>.json`, where `<name>` is the `name` in your `plugin.json`:
 | `author` | yes | your GitHub name, shown as "by @author" (the maintainer-only `tier` field, see [manifests/README.md](manifests/README.md), replaces it for first-party plugins and is not available to community authors) |
 | `license` | yes | SPDX id from the allowlist: `MIT`, `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `ISC`, `MPL-2.0`, `GPL-2.0`, `GPL-3.0`, `LGPL-2.1`, `LGPL-3.0`, `AGPL-3.0` (GPL, LGPL and AGPL also as `-only` or `-or-later`) |
 | `archive_grant` | yes | must be `true`: your perpetual, irrevocable grant to archive, build, sign and redistribute the source at the pinned commit and its builds |
-| `sdk` | yes | SDK range you built against; matches `plugin.json` |
+| `sdk` | yes | SDK range you built against; matches `plugin.json`; declare `^0.11` unless your users run Hatamoto v0.31.0 or later (older hosts refuse `^0.12`) |
 | `homepage` | no | an `https://` link |
 
 No other keys are allowed. See [manifests/schema.json](manifests/schema.json).

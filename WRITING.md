@@ -45,6 +45,13 @@ require hatamoto.dev/sdk v0.11.0
 require github.com/extism/go-pdk v1.1.3 // indirect
 ```
 
+SDK 0.12.0 ships with Hatamoto v0.31.0, and a host older than v0.31.0 refuses a
+plugin that declares `^0.12`. Until your users run v0.31.0, require
+`hatamoto.dev/sdk v0.11.0` and declare `"sdk": "^0.11"`; a newer host still serves
+`^0.11` plugins (it serves every SDK minor from 0.5). The `site.scripts`
+permission does not need `^0.12`: hosts from v0.30.0 accept and enforce it under
+any range. The compatibility promises are in [STABILITY.md](https://github.com/zenlabscorp/hatamoto-sdk/blob/main/STABILITY.md).
+
 ## 2. Lay out the files
 
 Copy the split used by the first-party `gtm` plugin
@@ -188,7 +195,7 @@ recommended.
 |---|---|
 | `name` | `^[a-z][a-z0-9-]{1,39}$`; also the name of your manifest file here |
 | `version` | your plugin's semver; bump it for every release |
-| `sdk` | SDK range you built against, for example `^0.11` |
+| `sdk` | SDK range you built against, for example `^0.11` (declare `^0.12` only once your users run Hatamoto v0.31.0 or later; older hosts refuse it) |
 | `description` | shown on the directory page |
 | `permissions` | capabilities you ask for (`settings`, `kv`, `db`, `http.fetch`, ...). Ask for the least you need; reviewers check each one |
 | `allowed_hosts` | the hosts `http.fetch` may call; list them exactly |
