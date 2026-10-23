@@ -29,7 +29,7 @@ with their own format and checks.
 | `author` | yes, unless `tier` is `first-party` | your GitHub name, shown as "by @author"; `^[A-Za-z0-9][A-Za-z0-9-]{0,38}$`; must be absent when `tier` is set |
 | `license` | yes | SPDX id from the allowlist: `MIT`, `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `ISC`, `MPL-2.0`, `GPL-2.0`, `GPL-3.0`, `LGPL-2.1`, `LGPL-3.0`, `AGPL-3.0` (GPL, LGPL and AGPL also as `-only` or `-or-later`) |
 | `archive_grant` | yes | must be the JSON value `true`: the author grants the Hatamoto project a perpetual, irrevocable right to archive, build, sign and redistribute the source at the pinned commit and its builds |
-| `sdk` | yes | SDK range you built against; must match `sdk` in `plugin.json` |
+| `sdk` | yes | SDK range you built against; must match `sdk` in `plugin.json`; declare `^0.11` unless your users run Hatamoto v0.31.0 or later (older hosts refuse `^0.12`) |
 | `homepage` | no | an `https://` link |
 | `tier` | no, maintainers only | the only allowed value is `first-party`; accepted only when `repo` is under `https://github.com/zenlabscorp/` (owner match is exact, case-insensitive) and `author` is absent. Community authors leave it out |
 
