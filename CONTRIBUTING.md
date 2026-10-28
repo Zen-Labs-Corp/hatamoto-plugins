@@ -98,8 +98,10 @@ Reviewers also check what a script cannot:
 - No near-duplicates from the same author.
 - A second rejection for spam closes your future pull requests.
 
-CI judges your manifest with the validator and `policy/` from `main`, not the
-copies in your pull request. Change the policy in its own pull request.
+The CI job that judges your manifest runs only code from `main`: the validator
+and `policy/` of `main`, not the copies in your pull request. Edits to the
+workflow or scripts are covered by maintainer review. Change the policy in its
+own pull request.
 
 ## The pull request
 

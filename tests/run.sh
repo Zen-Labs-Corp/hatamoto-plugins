@@ -304,6 +304,13 @@ rd reject "four brands" '"Connects Slack, Zapier, Notion and Github now"' "more 
 rd reject "banned word" '"The best contact page for your site"' 'banned word "best"'
 rd reject "banned word #1" '"Adds a contact page, rated #1 by users"' 'banned word "#1"'
 
+# validate.yml: the judge job runs no pull request code and fails closed.
+wf=.github/workflows/validate.yml
+judge=$(awk '/^  judge:/{on=1;print;next} on && /^  [a-z]+:/{exit} on{print}' "$wf")
+if [ -n "$judge" ] && ! grep -Eq 'tests/|scripts/validate-(theme-)?manifest\.sh "\$f"|scripts/check' <<<"$judge"; then ok "judge job runs no pull request code"; else no "judge job runs no pull request code"; fi
+if grep -q 'diff-filter=AMRT' <<<"$judge" && grep -q '100644' <<<"$judge"; then ok "judge job lists type changes and requires regular files"; else no "judge job lists type changes and requires regular files"; fi
+if grep -q 'exit 1' <<<"$judge" && ! grep -q 'fetch_trusted\|return 1\|return 0' <<<"$judge"; then ok "judge job stops when a base file is missing"; else no "judge job stops when a base file is missing"; fi
+
 # scripts/check-gomod.sh: plain-module rules of the registry build.
 if command -v go >/dev/null; then
   g=scripts/check-gomod.sh
