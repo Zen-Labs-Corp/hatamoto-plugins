@@ -1,0 +1,11 @@
+{
+  "name": "google-analytics",
+  "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
+  "commit": "53f9aff4c6bbabe22236ff62ece7d5a833d35ade",
+  "subdir": "plugins/google-analytics",
+  "title": "Google Analytics",
+  "license": "Apache-2.0",
+  "sdk": "^0.8",
+  "archive_grant": true,
+  "tier": "first-party"
+}
