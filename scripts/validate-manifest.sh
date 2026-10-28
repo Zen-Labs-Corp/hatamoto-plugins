@@ -265,7 +265,8 @@ fi
 if has title; then
   if [ -z "$title" ] || [ "${#title}" -gt 40 ] || [[ $title =~ [[:cntrl:]] ]] || [[ $title == " "* ]] || [[ $title == *" " ]]; then
     bad "title must be 1 to 40 characters, no control characters, no leading or trailing space"
-  elif [ -n "$title" ]; then
+  fi
+  if [ -n "$title" ]; then
     jt() { jv "$title" "$1" title; }
     if jt "$unsafe_chars_filter"; then
       bad "title must not contain emoji, symbols or invisible characters"

@@ -118,14 +118,24 @@ mkdir -p "$tmp/lk/themes"
 jq '.name = "acme-sync"' "$f/good.json" > "$tmp/lk/acme-sync.json"
 jq '.name = "gtm" | .tier = "first-party" | .repo = "https://github.com/Zen-Labs-Corp/x" | del(.author)' "$f/good.json" > "$tmp/lk/gtm.json"
 echo '{}' > "$tmp/lk/themes/sumi-ink.json"
-lk() { # lk <accept|reject> <name>
+lk() { # lk <accept|reject> <name> [want]: a rejection must print the want substring.
+  local err
   jq --arg n "$2" '.name = $n' "$f/good.json" > "$tmp/lk/$2.json"
-  if "$v" "$tmp/lk/$2.json" >/dev/null 2>&1; then [ "$1" = accept ] && ok "look-alike: accepts $2" || no "look-alike: accepts $2"
-  else [ "$1" = reject ] && ok "look-alike: rejects $2" || no "look-alike: rejects $2"; fi
+  if err=$("$v" "$tmp/lk/$2.json" 2>&1 >/dev/null); then [ "$1" = accept ] && ok "look-alike: accepts $2" || no "look-alike: accepts $2"
+  elif [ "$1" = accept ]; then no "look-alike: accepts $2: $err"
+  elif [[ $err == *"${3:-}"* ]]; then ok "look-alike: rejects $2"
+  else no "look-alike: rejects $2: $err"; fi
 }
 if "$v" "$tmp/lk/gtm.json" >/dev/null 2>&1; then ok "look-alike: an existing manifest is not its own look-alike"; else no "look-alike: self"; fi
 lk accept acme-other
-for n in gtn acme-synk acme-syn acmesync acme-sync2 acm3-sync sumi-ink2 l0gin; do lk reject "$n"; done
+lk reject gtn 'looks like "gtm"'
+lk reject acme-synk 'looks like "acme-sync"'
+lk reject acme-syn 'looks like "acme-sync"'
+lk reject acmesync 'looks like "acme-sync"'
+lk reject acme-sync2 'looks like "acme-sync"'
+lk reject acm3-sync 'looks like "acme-sync"'
+lk reject sumi-ink2 'looks like "sumi-ink"'
+lk reject l0gin 'looks like "login"'
 
 # Fail closed without the policy lists.
 mkdir -p "$tmp/root/scripts" "$tmp/root2/scripts" "$tmp/root2/policy"
@@ -197,21 +207,25 @@ for l in WTFPL Proprietary "" mit "MIT OR Apache-2.0" AGPL-1.0; do
 done
 
 # title: a display name, 1 to 40 characters, one script, no symbols; community titles share a word with the name.
-# tt <accept|reject> <title> [first-party]: good.json (or a first-party gtm) with that title.
+# tt <accept|reject> <title> [first-party] [want] [name]: good.json (or a first-party gtm) with that
+# title, and the name when given. A rejection must print the want substring.
 tt() {
-  local m=good
+  local m=${5:-good} err
   mkdir -p "$tmp/tt"
   if [ -n "${3:-}" ]; then m=gtm; fp gtm zenlabscorp; jq --arg t "$2" '.title = $t' "$tmp/gtm.json" > "$tmp/tt/gtm.json"
-  else jq --arg t "$2" '.title = $t' "$f/good.json" > "$tmp/tt/good.json"; fi
-  if "$v" "$tmp/tt/$m.json" >/dev/null 2>&1; then [ "$1" = accept ] && ok "title accepted: $2" || no "title accepted: $2"
-  else [ "$1" = reject ] && ok "title rejected: $2" || no "title rejected: $2"; fi
+  else jq --arg t "$2" --arg n "$m" '.title = $t | .name = $n' "$f/good.json" > "$tmp/tt/$m.json"; fi
+  if err=$("$v" "$tmp/tt/$m.json" 2>&1 >/dev/null); then [ "$1" = accept ] && ok "title accepted: $2" || no "title accepted: $2"
+  elif [ "$1" = accept ]; then no "title accepted: $2: $err"
+  elif [[ $err == *"${4:-}"* ]]; then ok "title rejected: $2"
+  else no "title rejected: $2: $err"; fi
 }
 for t in "Good Helper" "Good" "Acme Sync for Stripe Good" "Good 1 Tools" "Good: Helper" "Good Helper!" "Good-Helper"; do tt accept "$t"; done
 x40=$(printf 'x%.0s' $(seq 36)); tt accept "Good $(printf 'x%.0s' $(seq 35))"
 tt reject "Good $x40"
 tt reject "Good $(printf 'x%.0s' $(seq 37))"
-tt reject "Lead Delivery: HubSpot, Zapier, Webhooks & Email"
-tt reject "Moksa Subscriptions 定期定額"
+tt reject "Lead Delivery: HubSpot, Zapier, Webhooks & Email" "" "more than one separator" lead-delivery
+tt reject "Lead Delivery: HubSpot, Zapier, Webhooks & Email" "" "1 to 40 characters" lead-delivery
+tt reject "Moksa Subscriptions 定期定額" "" "title mixes scripts" moksa
 tt reject "Best Good Plugin"
 tt reject "Good #1 Helper"
 tt reject "Good Free Helper"
