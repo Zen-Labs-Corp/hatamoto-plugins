@@ -1,7 +1,7 @@
 # Write a Hatamoto plugin in your own GitHub repo
 
 > **Status:** the Hatamoto SDK (`hatamoto.dev/sdk`, source at
-> <https://github.com/zenlabscorp/hatamoto-sdk>) is public: `go get` works today.
+> <https://github.com/Zen-Labs-Corp/hatamoto-sdk>) is public: `go get` works today.
 > Community submissions to this registry open when Hatamoto core goes public.
 
 A plugin is a WebAssembly module built with the standard Go toolchain, plus a
@@ -50,12 +50,12 @@ plugin that declares `^0.12`. Until your users run v0.31.0, require
 `hatamoto.dev/sdk v0.11.0` and declare `"sdk": "^0.11"`; a newer host still serves
 `^0.11` plugins (it serves every SDK minor from 0.5). The `site.scripts`
 permission does not need `^0.12`: hosts from v0.30.0 accept and enforce it under
-any range. The compatibility promises are in [STABILITY.md](https://github.com/zenlabscorp/hatamoto-sdk/blob/main/STABILITY.md).
+any range. The compatibility promises are in [STABILITY.md](https://github.com/Zen-Labs-Corp/hatamoto-sdk/blob/main/STABILITY.md).
 
 ## 2. Lay out the files
 
 Copy the split used by the first-party `gtm` plugin
-(<https://github.com/zenlabscorp/hatamoto-plugin-gtm>). It keeps the code that only
+(<https://github.com/Zen-Labs-Corp/hatamoto-first-party/tree/main/plugins/gtm>). It keeps the code that only
 makes sense inside WebAssembly apart from the code you can unit test on your
 machine:
 

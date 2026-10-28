@@ -35,7 +35,7 @@ Out of scope:
 
 - Vulnerabilities in Hatamoto core (the server, admin, API, plugin host, SDK,
   updater). Report those following the
-  [core security policy](https://github.com/zenlabscorp/hatamoto/blob/main/SECURITY.md).
+  [core security policy](https://github.com/Zen-Labs-Corp/hatamoto/blob/main/SECURITY.md).
 - Vulnerabilities in a listed plugin or theme. Report them to its author, whose
   repository the manifest points to. If a listed plugin is actively harmful,
   tell us at the address above and maintainers may remove its manifest.
