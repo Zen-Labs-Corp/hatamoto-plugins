@@ -79,13 +79,18 @@ CI rejects a manifest that breaks these rules. The word lists are plain text in
   [policy/brands.txt](policy/brands.txt) unless you own it (`acme-stripe` is
   fine, `stripe-checkout` is not), and it may not look like another listing or a
   reserved name (one character apart, or equal once `-` is removed and `0 1 3 5`
-  are read as `o l e s`).
-- **Title.** At most 40 characters, at most one of `: , & / | +`, no brackets,
-  emoji or symbols, one script only (Han with Kana or Hangul counts as one), no
-  word from [policy/banned-words.txt](policy/banned-words.txt), no brand as the
-  first word, and it shares a word with the name.
+  are read as `o l e s`). This can reject ordinary words: `auto` looks like
+  `auth` and `logic` like `login`.
+- **Title.** At most 40 characters, only letters, digits, spaces and
+  `. , : & / | + ' ! ? -`, at most one of `: , & / | +` or a spaced hyphen
+  (` - `), one script only (Han with Kana or Hangul counts as one), no word from
+  [policy/banned-words.txt](policy/banned-words.txt), no brand as the start of
+  the first word, and it shares a word with the name (digits alone do not count).
+  Look-alike letters (for example Cyrillic `а`) are read as the Latin letter
+  when the words are checked.
 - **Description** (in `plugin.json`). 20 to 160 characters, at most two
-  sentence endings, no URL or domain, no emoji, not the title or the name, not a
+  sentence endings, no URL or domain, only letters, digits, spaces and ASCII
+  punctuation (no combining marks, fullwidth forms, emoji or symbols), not the title or the name, not a
   placeholder from [policy/placeholders.txt](policy/placeholders.txt), at most
   three brands, and no banned word except `free` and `plugin`.
 
