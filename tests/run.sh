@@ -30,7 +30,10 @@ expect_reject bad-commit.json "commit must be 40"
 expect_reject bad-repo.json "repo must be https://github.com"
 expect_reject missing-sdk.json "missing required field: sdk"
 expect_reject extra-field.json "unknown field(s): price"
-expect_reject bad-title.json "title must be 1 to 60"
+expect_reject bad-title.json "title must be 1 to 40"
+expect_reject bad-title-separators.json "more than one separator"
+expect_reject bad-title-script.json "title mixes scripts"
+expect_reject bad-title-words.json 'banned word "best"'
 expect_reject missing-grant.json "missing required field: archive_grant"
 expect_reject bad-grant.json "archive_grant must be true"
 expect_reject bad-author.json 'author "google" must equal the repo owner "acme"'
@@ -186,13 +189,59 @@ for l in WTFPL Proprietary "" mit "MIT OR Apache-2.0" AGPL-1.0; do
   if "$v" "$tmp/good.json" >/dev/null 2>&1; then no "rejects license '$l'"; else ok "rejects license '$l'"; fi
 done
 
-# title: a display name, 1 to 60 characters, no control characters, no leading or trailing space.
-jq '. + {"title": "Acme SEO Helper"}' "$f/good.json" > "$tmp/good.json"
-if "$v" "$tmp/good.json" >/dev/null 2>&1; then ok "accepts title"; else no "accepts title"; fi
-for t in $'Dev\u00a0Tools' $'Code \U0001F468\u200d\U0001F4BB' "$(printf '\u65e5%.0s' $(seq 25))"; do
-  jq --arg t "$t" '. + {title: $t}' "$f/good.json" > "$tmp/good.json"
-  if "$v" "$tmp/good.json" >/dev/null 2>&1; then ok "accepts title $t"; else no "accepts title $t"; fi
-done
+# title: a display name, 1 to 40 characters, one script, no symbols; community titles share a word with the name.
+# tt <accept|reject> <title> [first-party]: good.json (or a first-party gtm) with that title.
+tt() {
+  local m=good
+  mkdir -p "$tmp/tt"
+  if [ -n "${3:-}" ]; then m=gtm; fp gtm zenlabscorp; jq --arg t "$2" '.title = $t' "$tmp/gtm.json" > "$tmp/tt/gtm.json"
+  else jq --arg t "$2" '.title = $t' "$f/good.json" > "$tmp/tt/good.json"; fi
+  if "$v" "$tmp/tt/$m.json" >/dev/null 2>&1; then [ "$1" = accept ] && ok "title accepted: $2" || no "title accepted: $2"
+  else [ "$1" = reject ] && ok "title rejected: $2" || no "title rejected: $2"; fi
+}
+for t in "Good Helper" "Good" "Acme Sync for Stripe Good" "Good 1 Tools" "Good: Helper" "Good Helper!" "Good-Helper"; do tt accept "$t"; done
+x40=$(printf 'x%.0s' $(seq 36)); tt accept "Good $(printf 'x%.0s' $(seq 35))"
+tt reject "Good $x40"
+tt reject "Good $(printf 'x%.0s' $(seq 37))"
+tt reject "Lead Delivery: HubSpot, Zapier, Webhooks & Email"
+tt reject "Moksa Subscriptions 定期定額"
+tt reject "Best Good Plugin"
+tt reject "Good #1 Helper"
+tt reject "Good Free Helper"
+tt reject "Good PRO"
+tt reject "Hatamoto Good"
+tt reject "Good Wordpress"
+tt reject "Stripe Good"
+tt reject "Helper Tools"
+tt reject "Good A: B: C"
+tt reject "Good & Co, Helper"
+tt reject "Good Helper$(printf '\u200b')"
+tt reject "Good$(printf '\u202e')Helper"
+tt reject "Good $(printf '\U0001F468\u200d\U0001F4BB')"
+tt reject "Good $(printf '\U0001F600')"
+tt reject "Good (Helper)"
+tt reject "Good [Helper]"
+tt reject "Good {Helper}"
+tt reject "Good <Helper>"
+tt reject "Good $(printf '\uff08x\uff09')"
+tt reject "Good $(printf '\u300cx\u300d')"
+tt reject "Good Dev$(printf '\u00a0')Tools"
+tt reject "Good $(printf '\u0430')bc"
+tt reject "Good Caf$(printf 'e\u0301')"
+tt reject "Good $(printf '\uff42\uff45\uff53\uff54')"
+tt reject "Good Tools $(printf '\u2605')"
+tt reject "Good $(printf '\u0928\u092e\u0938\u094d\u0924\u0947')"
+# First-party titles still get the character, script and word rules, but need not share a word.
+tt accept "Google Tag Manager" fp
+tt accept "$(printf '\u65e5\u672c\u8a9e\u306e\u30bf\u30a4\u30c8\u30eb\u30fc')" fp
+tt accept "$(printf '\u6f22\u5b57 \ud55c\uae00')" fp
+tt accept "$(printf '\u65e5%.0s' $(seq 25))" fp
+tt reject "$(printf '\u3072\u3089\u304c\u306a \ud55c\uae00')" fp
+tt reject "Tag $(printf '\u0416')" fp
+tt reject "Best Tag Manager" fp
+tt reject "Tag (Manager)" fp
+tt reject "Tag: Manager, Pro" fp
+tt reject "$(printf 'x%.0s' $(seq 41))" fp
 for case in '"title": "a\tb"' '"title": "a "' '"title": ""' '"title": " padded"' '"title": "a\u0007b"' "\"title\": \"$(printf 'x%.0s' $(seq 61))\"" '"title": 5'; do
   jq ". + {$case}" "$f/good.json" > "$tmp/good.json"
   if "$v" "$tmp/good.json" >/dev/null 2>&1; then no "rejects $case"; else ok "rejects $case"; fi

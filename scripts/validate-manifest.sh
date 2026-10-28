@@ -233,8 +233,71 @@ if has subdir && [ -n "$subdir" ]; then
   fi
 fi
 if has title; then
-  if [ -z "$title" ] || [ "${#title}" -gt 60 ] || [[ $title =~ [[:cntrl:]] ]] || [[ $title == " "* ]] || [[ $title == *" " ]]; then
-    bad "title must be 1 to 60 characters, no control characters, no leading or trailing space"
+  if [ -z "$title" ] || [ "${#title}" -gt 40 ] || [[ $title =~ [[:cntrl:]] ]] || [[ $title == " "* ]] || [[ $title == *" " ]]; then
+    bad "title must be 1 to 40 characters, no control characters, no leading or trailing space"
+  elif [ -n "$title" ]; then
+    # jt <jq filter>: the filter is a literal; the title only enters as --arg.
+    # A jq failure rejects (fail closed).
+    jt() {
+      local r
+      r=$(jq -n --arg t "$title" "$1") || { bad "title could not be checked"; return 1; }
+      [ "$r" = true ]
+    }
+    if jt '$t | test("\\p{Cf}|\\p{Co}|\\p{Cs}|\\p{So}|\\p{Sk}|\\p{Extended_Pictographic}|\\p{Emoji_Presentation}")'; then
+      bad "title must not contain emoji, symbols or invisible characters"
+    fi
+    if jt '[$t | scan("[:,&/|+]")] | length > 1'; then
+      bad "title \"$title\" has more than one separator (: , & / | +)"
+    fi
+    if jt '$t | test("[\\[\\](){}<>]|\\p{Ps}|\\p{Pe}")'; then
+      bad "title must not contain brackets"
+    fi
+    if jt '$t | test("[\uFF00-\uFFEF]")'; then
+      bad "title must not contain fullwidth or halfwidth forms"
+    fi
+    if jt '$t | test("^[\\p{L}\\p{N} .,:&/|+\u0027!?-]*$") | not'; then
+      bad "title may contain only letters, digits, spaces and . , : & / | + ' ! ? -"
+    fi
+    # One script: Han with Kana or Hangul counts as one group, Kana with Hangul does not.
+    scripts=$(jq -nr --arg t "$title" '
+      def has($re): $t | test($re);
+      [ (if has("\\p{Latin}") then "Latin" else empty end),
+        (if has("[\\p{Han}\\p{Hiragana}\\p{Katakana}\\p{Hangul}ー]")
+         then (if has("[\\p{Hiragana}\\p{Katakana}ー]") and has("\\p{Hangul}") then "Kana", "Hangul" else "Han/Kana/Hangul" end)
+         else empty end),
+        (if has("\\p{Cyrillic}") then "Cyrillic" else empty end),
+        (if has("\\p{Arabic}") then "Arabic" else empty end),
+        (if has("\\p{Greek}") then "Greek" else empty end),
+        (if has("\\p{Hebrew}") then "Hebrew" else empty end),
+        (if has("[^\\p{Latin}\\p{Han}\\p{Hiragana}\\p{Katakana}\\p{Hangul}ー\\p{Cyrillic}\\p{Arabic}\\p{Greek}\\p{Hebrew}\\P{L}]") then "other" else empty end)
+      ] | join(" ")') || { bad "title could not be checked"; scripts=""; }
+    case $scripts in
+      *other*) bad "title uses a script that is not accepted" ;;
+      *" "*) bad "title mixes scripts: $scripts" ;;
+    esac
+    # Words: lowercase alphanumeric tokens ('#' kept so "#1" is a word).
+    title_words=$(jq -nr --arg t "$title" '$t | ascii_downcase | scan("[\\p{L}\\p{N}#]+")') \
+      || { bad "title could not be checked"; title_words=""; }
+    first_word=""
+    while read -r w; do
+      [ -n "$w" ] || continue
+      [ -n "$first_word" ] || first_word=$w
+      if inlist "$banned_words" "$w"; then bad "title contains the banned word \"$w\""; fi
+    done <<<"$title_words"
+    if [ "$fpx" -eq 0 ]; then
+      if [ -n "$first_word" ] && brand_listed "$first_word" && ! brand_owned "$first_word" "$owner"; then
+        bad "title must not start with the brand \"$first_word\""
+      fi
+      # The title must share an alphanumeric word with the name.
+      shared=0
+      if [[ $name =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
+        IFS=- read -ra ntoks <<<"$name"
+        while read -r w; do
+          for t in "${ntoks[@]}"; do [ "$w" = "$t" ] && shared=1; done
+        done <<<"$(jq -nr --arg t "$title" '$t | ascii_downcase | scan("[\\p{L}\\p{N}]+")' || true)"
+      fi
+      [ "$shared" -eq 1 ] || bad "title must share a word with the name"
+    fi
   fi
 fi
 if has author && ! [[ $author =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,38}$ ]]; then
