@@ -35,53 +35,54 @@ upstream() {
   gi -C "$1" add -A
   gi -C "$1" commit -qm init
 }
+# The validator also requires author == repo owner, so the author is the parent dir "up".
 # manifest <name> <repo-dir> <commit> [jq filter]: manifests/<name>.json from good.json.
 manifest() {
   mkdir -p "$tmp/manifests"
-  jq --arg n "$1" --arg r "file://$2" --arg c "$3" '.name = $n | .repo = $r | .commit = $c' \
+  jq --arg n "$1" --arg r "file://$2" --arg c "$3" '.name = $n | .repo = $r | .commit = $c | .author = "up"' \
     "tests/fixtures/good.json" | jq "${4:-.}" >"$tmp/manifests/$1.json"
 }
 
 # --- basic mirror ---------------------------------------------------------
-upstream "$tmp/up/alpha" alpha 1.2.3
-sha=$(git -C "$tmp/up/alpha" rev-parse HEAD)
-manifest alpha "$tmp/up/alpha" "$sha"
-mir=$tmp/mirrors/alpha
-out=$(GH_TOKEN=sekret-token-value "$m" "$tmp/manifests/alpha.json" 2>&1)
+upstream "$tmp/up/amber" amber 1.2.3
+sha=$(git -C "$tmp/up/amber" rev-parse HEAD)
+manifest amber "$tmp/up/amber" "$sha"
+mir=$tmp/mirrors/amber
+out=$(GH_TOKEN=sekret-token-value "$m" "$tmp/manifests/amber.json" 2>&1)
 if [ $? -eq 0 ]; then ok "mirrors a plugin"; else no "mirrors a plugin: $out"; fi
 case "$out" in *sekret-token-value*) no "token leaked into output" ;; *) ok "no token in output" ;; esac
 [ "$(git -C "$mir" rev-parse "refs/tags/src/$sha^{commit}^")" = "$sha" ] && ok "top commit parent is the pinned commit" || no "top commit parent"
 [ "$(git -C "$mir" cat-file -t "src/$sha")" = tag ] && ok "src/<commit> is an annotated tag" || no "src tag annotated"
 [ "$(git -C "$mir" cat-file -t v1.2.3)" = tag ] && ok "v<version> is an annotated tag" || no "version tag annotated"
 [ "$(git -C "$mir" rev-parse "src/$sha^{commit}")" = "$(git -C "$mir" rev-parse v1.2.3^{commit})" ] && ok "both tags name the mirror commit" || no "tags differ"
-if git -C "$mir" show "src/$sha^{commit}:MIRROR.json" | jq -e --arg c "$sha" --arg r "file://$tmp/up/alpha" \
-  '.name == "alpha" and .version == "1.2.3" and .upstream == $r and .commit == $c and .vendored == false and (.mirrored_at | length > 0)' >/dev/null; then
+if git -C "$mir" show "src/$sha^{commit}:MIRROR.json" | jq -e --arg c "$sha" --arg r "file://$tmp/up/amber" \
+  '.name == "amber" and .version == "1.2.3" and .upstream == $r and .commit == $c and .vendored == false and (.mirrored_at | length > 0)' >/dev/null; then
   ok "MIRROR.json fields, vendored false without SDK_PUBLIC"; else no "MIRROR.json fields"; fi
 [ "$(git -C "$mir" diff --name-only "$sha" "src/$sha^{commit}")" = MIRROR.json ] && ok "mirror commit adds only MIRROR.json when unvendored" || no "mirror commit paths"
 [ "$(git -C "$mir" rev-parse main)" = "$(git -C "$mir" rev-parse "src/$sha^{commit}")" ] && ok "main created on first mirror" || no "main created"
 
 # --- idempotence ----------------------------------------------------------
 before=$(git -C "$mir" for-each-ref --format='%(refname) %(objectname)')
-if "$m" "$tmp/manifests/alpha.json" >/dev/null 2>&1; then ok "re-run on identical content exits 0"; else no "re-run exits 0"; fi
+if "$m" "$tmp/manifests/amber.json" >/dev/null 2>&1; then ok "re-run on identical content exits 0"; else no "re-run exits 0"; fi
 [ "$before" = "$(git -C "$mir" for-each-ref --format='%(refname) %(objectname)')" ] && ok "re-run changes no ref" || no "re-run changes refs"
 
 # --- differing content under an existing src tag --------------------------
-upstream "$tmp/up/beta" beta 2.0.0
-bsha=$(git -C "$tmp/up/beta" rev-parse HEAD)
-manifest beta "$tmp/up/beta" "$bsha"
-git clone -q "$tmp/up/beta" "$tmp/seed"
+upstream "$tmp/up/birch" birch 2.0.0
+bsha=$(git -C "$tmp/up/birch" rev-parse HEAD)
+manifest birch "$tmp/up/birch" "$bsha"
+git clone -q "$tmp/up/birch" "$tmp/seed"
 echo x >"$tmp/seed/extra.txt"
 gi -C "$tmp/seed" add -A
 gi -C "$tmp/seed" commit -qm other
 gi -C "$tmp/seed" tag -a -m other "src/$bsha"
-git init -q --bare "$tmp/mirrors/beta"
-git -C "$tmp/seed" push -q "$tmp/mirrors/beta" "refs/tags/src/$bsha"
-tag_before=$(git -C "$tmp/mirrors/beta" rev-parse "src/$bsha")
-if err=$("$m" "$tmp/manifests/beta.json" 2>&1); then no "differing content rejected"
+git init -q --bare "$tmp/mirrors/birch"
+git -C "$tmp/seed" push -q "$tmp/mirrors/birch" "refs/tags/src/$bsha"
+tag_before=$(git -C "$tmp/mirrors/birch" rev-parse "src/$bsha")
+if err=$("$m" "$tmp/manifests/birch.json" 2>&1); then no "differing content rejected"
 elif [[ $err == *"touches extra.txt"* ]]; then ok "differing content under src/<commit> rejected"
 else no "differing content: $err"; fi
-[ "$tag_before" = "$(git -C "$tmp/mirrors/beta" rev-parse "src/$bsha")" ] && ok "tag not moved" || no "tag moved"
-[ -z "$(git -C "$tmp/mirrors/beta" tag -l 'v*')" ] && ok "nothing else pushed after the refusal" || no "extra tags pushed"
+[ "$tag_before" = "$(git -C "$tmp/mirrors/birch" rev-parse "src/$bsha")" ] && ok "tag not moved" || no "tag moved"
+[ -z "$(git -C "$tmp/mirrors/birch" tag -l 'v*')" ] && ok "nothing else pushed after the refusal" || no "extra tags pushed"
 
 # --- v<version> already present elsewhere is kept -------------------------
 upstream "$tmp/up/gamma" gamma 3.0.0
@@ -97,12 +98,12 @@ if "$m" "$tmp/manifests/gamma.json" >/dev/null 2>&1 \
   ok "existing v<version> tag kept, src tag added"; else no "existing v<version> tag"; fi
 
 # --- missing grant, bad license -------------------------------------------
-manifest delta "$tmp/up/alpha" "$sha" 'del(.archive_grant)'
+manifest delta "$tmp/up/amber" "$sha" 'del(.archive_grant)'
 if "$m" "$tmp/manifests/delta.json" >/dev/null 2>&1; then no "missing grant refused"; else ok "missing grant refused"; fi
 [ ! -e "$tmp/mirrors/delta" ] && ok "no mirror created for a refused manifest" || no "mirror created for a refused manifest"
 
 # --- plugin.json name mismatch --------------------------------------------
-manifest epsilon "$tmp/up/alpha" "$sha"
+manifest epsilon "$tmp/up/amber" "$sha"
 if "$m" "$tmp/manifests/epsilon.json" >/dev/null 2>&1; then no "name mismatch refused"; else ok "name mismatch refused"; fi
 
 # --- vendoring (SDK_PUBLIC=true) ------------------------------------------
@@ -166,15 +167,15 @@ if "$m" "$tmp/manifests/lambda.json" >/dev/null 2>&1 && [ "$(git -C "$tmp/mirror
   ok "existing main kept, src tag added"; else no "existing main must not move"; fi
 
 # --- tampered existing src/<commit>: wrong parent -------------------------
-upstream "$tmp/up/mu" mu 1.0.0
-musha=$(git -C "$tmp/up/mu" rev-parse HEAD)
-manifest mu "$tmp/up/mu" "$musha"
+upstream "$tmp/up/mulberry" mulberry 1.0.0
+musha=$(git -C "$tmp/up/mulberry" rev-parse HEAD)
+manifest mulberry "$tmp/up/mulberry" "$musha"
 git init -q "$tmp/museed"
-echo '{"name":"mu"}' >"$tmp/museed/MIRROR.json"; gi -C "$tmp/museed" add -A; gi -C "$tmp/museed" commit -qm orphan
+echo '{"name":"mulberry"}' >"$tmp/museed/MIRROR.json"; gi -C "$tmp/museed" add -A; gi -C "$tmp/museed" commit -qm orphan
 gi -C "$tmp/museed" tag -a -m t "src/$musha"
-git init -q --bare "$tmp/mirrors/mu"
-git -C "$tmp/museed" push -q "$tmp/mirrors/mu" "refs/tags/src/$musha"
-if err=$("$m" "$tmp/manifests/mu.json" 2>&1); then no "wrong-parent src tag rejected"
+git init -q --bare "$tmp/mirrors/mulberry"
+git -C "$tmp/museed" push -q "$tmp/mirrors/mulberry" "refs/tags/src/$musha"
+if err=$("$m" "$tmp/manifests/mulberry.json" 2>&1); then no "wrong-parent src tag rejected"
 elif [[ $err == *"not a single commit on top of"* ]]; then ok "wrong-parent src tag rejected"
 else no "wrong-parent: $err"; fi
 
@@ -188,14 +189,14 @@ env >"$tmp/go-env.txt"
 exec "$realgo" "\$@"
 FAKE
 chmod +x "$tmp/fakebin/go"
-upstream "$tmp/up/nu" nu 1.0.0
-nsha=$(git -C "$tmp/up/nu" rev-parse HEAD)
-manifest nu "$tmp/up/nu" "$nsha"
-if err=$(PATH=$tmp/fakebin:$PATH SDK_PUBLIC=true FAKE_GO_TOUCH=main.go "$m" "$tmp/manifests/nu.json" 2>&1); then no "go mod vendor outside vendor/ rejected"
+upstream "$tmp/up/nutmeg" nutmeg 1.0.0
+nsha=$(git -C "$tmp/up/nutmeg" rev-parse HEAD)
+manifest nutmeg "$tmp/up/nutmeg" "$nsha"
+if err=$(PATH=$tmp/fakebin:$PATH SDK_PUBLIC=true FAKE_GO_TOUCH=main.go "$m" "$tmp/manifests/nutmeg.json" 2>&1); then no "go mod vendor outside vendor/ rejected"
 elif [[ $err == *"changed files outside"* ]]; then ok "go mod vendor outside vendor/ rejected"
 else no "vendor outside: $err"; fi
-git -C "$tmp/mirrors/nu" rev-parse -q --verify "refs/tags/src/$nsha" >/dev/null 2>&1 && no "nothing pushed after the vendor failure" || ok "nothing pushed after the vendor failure"
-PATH=$tmp/fakebin:$PATH SDK_PUBLIC=true GH_TOKEN=sekret-token-value "$m" "$tmp/manifests/nu.json" >/dev/null 2>&1
+git -C "$tmp/mirrors/nutmeg" rev-parse -q --verify "refs/tags/src/$nsha" >/dev/null 2>&1 && no "nothing pushed after the vendor failure" || ok "nothing pushed after the vendor failure"
+PATH=$tmp/fakebin:$PATH SDK_PUBLIC=true GH_TOKEN=sekret-token-value "$m" "$tmp/manifests/nutmeg.json" >/dev/null 2>&1
 if [ -s "$tmp/go-env.txt" ] && ! grep -q 'GH_TOKEN\|sekret-token-value' "$tmp/go-env.txt"; then ok "GH_TOKEN absent from the go mod vendor environment"; else no "GH_TOKEN reached go mod vendor"; fi
 
 # --- plugin in a subdirectory, vendored under the subdir ------------------

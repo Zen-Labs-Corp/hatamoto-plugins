@@ -33,6 +33,10 @@ expect_reject extra-field.json "unknown field(s): price"
 expect_reject bad-title.json "title must be 1 to 60"
 expect_reject missing-grant.json "missing required field: archive_grant"
 expect_reject bad-grant.json "archive_grant must be true"
+expect_reject bad-author.json 'author "google" must equal the repo owner "acme"'
+expect_reject bad-name-brand.json 'name must not start with the brand "stripe"'
+expect_reject bad-name-reserved.json 'name "seo" is reserved'
+expect_reject bad-name-token.json 'contains the banned word "beta"'
 expect_reject bad-license.json "license must be one of"
 
 # name must equal the file name.
@@ -91,6 +95,49 @@ if "$v" "$tmp/good.json" >/dev/null 2>&1; then no "community manifest with tier 
 jq 'del(.author)' "$f/good.json" > "$tmp/good.json"
 if err=$("$v" "$tmp/good.json" 2>&1 >/dev/null); then no "missing author rejected"
 elif [[ $err == *"missing required field: author"* ]]; then ok "missing author rejected"; else no "missing author: $err"; fi
+
+# Author must equal the repo owner, case-insensitively; a listed brand owner may use the brand.
+jq '.author = "ACME"' "$f/good.json" > "$tmp/good.json"
+if "$v" "$tmp/good.json" >/dev/null 2>&1; then ok "author compared case-insensitively"; else no "author compared case-insensitively"; fi
+for n in acme-stripe; do
+  jq --arg n "$n" '.name = $n' "$f/good.json" > "$tmp/$n.json"
+  if "$v" "$tmp/$n.json" >/dev/null 2>&1; then ok "accepts name $n"; else no "accepts name $n"; fi
+done
+jq '.name = "google-sync" | .repo = "https://github.com/Zen-Labs-Corp/x"' "$f/good.json" | jq '.author = "zen-labs-corp"' > "$tmp/google-sync.json"
+if "$v" "$tmp/google-sync.json" >/dev/null 2>&1; then ok "brand owner may use the brand"; else no "brand owner may use the brand"; fi
+jq '.name = "google-sync"' "$f/good.json" > "$tmp/google-sync.json"
+if "$v" "$tmp/google-sync.json" >/dev/null 2>&1; then no "brand rejected for another owner"; else ok "brand rejected for another owner"; fi
+
+# Look-alike names against sibling manifests (themes included) and reserved names.
+mkdir -p "$tmp/lk/themes"
+jq '.name = "acme-sync"' "$f/good.json" > "$tmp/lk/acme-sync.json"
+jq '.name = "gtm" | .tier = "first-party" | .repo = "https://github.com/Zen-Labs-Corp/x" | del(.author)' "$f/good.json" > "$tmp/lk/gtm.json"
+echo '{}' > "$tmp/lk/themes/sumi-ink.json"
+lk() { # lk <accept|reject> <name>
+  jq --arg n "$2" '.name = $n' "$f/good.json" > "$tmp/lk/$2.json"
+  if "$v" "$tmp/lk/$2.json" >/dev/null 2>&1; then [ "$1" = accept ] && ok "look-alike: accepts $2" || no "look-alike: accepts $2"
+  else [ "$1" = reject ] && ok "look-alike: rejects $2" || no "look-alike: rejects $2"; fi
+}
+if "$v" "$tmp/lk/gtm.json" >/dev/null 2>&1; then ok "look-alike: an existing manifest is not its own look-alike"; else no "look-alike: self"; fi
+lk accept acme-other
+for n in gtn acme-synk acme-syn acmesync acme-sync2 acm3-sync sumi-ink2 l0gin; do lk reject "$n"; done
+
+# Fail closed without the policy lists.
+mkdir -p "$tmp/root/scripts" "$tmp/root2/scripts" "$tmp/root2/policy"
+cp scripts/validate-manifest.sh "$tmp/root/scripts/"
+cp scripts/validate-manifest.sh "$tmp/root2/scripts/"
+cp policy/*.txt "$tmp/root2/policy/"; rm "$tmp/root2/policy/brands.txt"
+for r in root root2; do
+  if err=$("$tmp/$r/scripts/validate-manifest.sh" "$f/good.json" 2>&1 >/dev/null); then no "$r: missing policy rejected"
+  elif [[ $err == *"missing policy"* ]]; then ok "$r: missing policy rejected"
+  else no "$r: missing policy: $err"; fi
+done
+
+# Every manifest of the registry keeps passing (schema.json is not a manifest).
+for m in manifests/*.json; do
+  [ "$m" = manifests/schema.json ] && continue
+  if "$v" "$m" >/dev/null 2>&1; then ok "registry manifest $m accepted"; else no "registry manifest $m accepted"; fi
+done
 
 # manifests/schema.json agrees on the same cases. Needs python3 jsonschema; a missing
 # module fails the suite unless SCHEMA_TESTS_ALLOW_SKIP=1.

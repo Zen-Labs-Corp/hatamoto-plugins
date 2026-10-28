@@ -3,6 +3,9 @@
 #
 # The rules mirror manifests/schema.json and the registry build script
 # (registry/build-community.sh in the Hatamoto core repo); keep the three in sync.
+# The listing rules (author, name, title, description) read their word lists from
+# ../policy next to this script. The registry build is to read the same files; it
+# is changed separately, so until then the listing rules are enforced here only.
 # --remote (CI) also checks the repo is reachable, the commit exists, and the
 # plugin.json at that commit carries the manifest name. Manifest values are only
 # ever passed as quoted arguments, never evaluated.
@@ -20,7 +23,7 @@ done
 # Owners whose repos may carry tier "first-party" (space separated, lowercase,
 # compared case-insensitively against the exact repo owner); keep in sync with
 # manifests/schema.json and FIRST_PARTY_OWNERS in the registry build script.
-FIRST_PARTY_OWNERS="zenlabscorp"
+FIRST_PARTY_OWNERS="zenlabscorp zen-labs-corp"
 
 usage() { echo "usage: $0 <manifest.json> [--remote]" >&2; exit 2; }
 
@@ -40,6 +43,52 @@ if ! jq -e 'type == "object"' "$file" >/dev/null 2>&1; then
   echo "$file: not a JSON object" >&2
   exit 1
 fi
+
+# Listing policy: fail closed when the directory or any list is unreadable.
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+pol=$here/../policy
+policy_ok=1
+for p in reserved-names banned-tokens banned-words brands placeholders; do
+  if [ ! -r "$pol/$p.txt" ]; then bad "missing policy: $p.txt"; policy_ok=0; fi
+done
+[ "$policy_ok" -eq 1 ] || exit 1
+# plist <list>: entries, trimmed and lowercased, without blanks and # comments.
+plist() {
+  jq -Rr 'ascii_downcase | gsub("\r"; "") | gsub("^\\s+|\\s+$"; "") | select(. != "" and (startswith("#") | not))' "$pol/$1.txt"
+}
+reserved_names=$(plist reserved-names)
+banned_tokens=$(plist banned-tokens)
+banned_words=$(plist banned-words)
+brands=$(plist brands)
+placeholders=$(plist placeholders)
+# inlist <newline separated list> <word>: exact whole-line membership.
+inlist() { [[ $'\n'$1$'\n' == *$'\n'"$2"$'\n'* ]]; }
+# brand_owned <brand> <owner>: the brand is listed with that owner.
+brand_owned() {
+  local b o owners
+  while read -r -a owners; do
+    [ "${owners[0]:-}" = "$1" ] || continue
+    for o in "${owners[@]:1}"; do [ "$o" = "$2" ] && return 0; done
+  done <<<"$brands"
+  return 1
+}
+# brand_listed <word>: the word is a brand in brands.txt.
+brand_listed() {
+  local b rest
+  while read -r b rest; do [ "$b" = "$1" ] && return 0; done <<<"$brands"
+  return 1
+}
+# lev1 <a> <b>: edit distance of at most 1.
+lev1() {
+  local a=$1 b=$2 i=0
+  [ "$a" = "$b" ] && return 0
+  while [ "$i" -lt "${#a}" ] && [ "$i" -lt "${#b}" ] && [ "${a:i:1}" = "${b:i:1}" ]; do i=$((i + 1)); done
+  a=${a:i}; b=${b:i}
+  while [ -n "$a" ] && [ -n "$b" ] && [ "${a: -1}" = "${b: -1}" ]; do a=${a%?}; b=${b%?}; done
+  [ "${#a}" -le 1 ] && [ "${#b}" -le 1 ]
+}
+# lkey <name>: hyphens removed, 0 1 3 5 folded to o l e s.
+lkey() { printf '%s' "$1" | tr -d '-' | tr '0135' 'oles'; }
 
 # field <name>: the string value, or empty when absent or not a string.
 field() { jq -r --arg k "$1" 'if (.[$k] | type) == "string" then .[$k] else "" end' "$file"; }
@@ -106,14 +155,25 @@ else
   has author || bad "missing required field: author"
 fi
 
+# First-party exempt from the brand and reserved-name rules: tier first-party
+# from an allowlisted owner.
+fpx=0
+if has tier && [ "$tier" = "first-party" ] && [ "$owner_ok" -eq 1 ]; then fpx=1; fi
+
+# Author of a community listing must be the repo owner (case-insensitive).
+if has author && ! has tier && [ "$(printf '%s' "$author" | tr '[:upper:]' '[:lower:]')" != "$owner" ]; then
+  bad "author \"$author\" must equal the repo owner \"$owner\""
+fi
+
 # Reserved names. gtm and searchconsole are first-party only; webhooks and hello
 # are never accepted. Keep in sync with the registry build script.
+reserved_flagged=0
 for reserved in webhooks hello; do
-  if [ "$name" = "$reserved" ]; then bad "name \"$name\" is reserved for a first-party plugin"; fi
+  if [ "$name" = "$reserved" ]; then bad "name \"$name\" is reserved for a first-party plugin"; reserved_flagged=1; fi
 done
 for reserved in gtm searchconsole; do
   if [ "$name" = "$reserved" ] && { [ "$tier" != "first-party" ] || [ "$owner_ok" -ne 1 ]; }; then
-    bad "name \"$name\" is reserved for a first-party plugin"
+    bad "name \"$name\" is reserved for a first-party plugin"; reserved_flagged=1
   fi
 done
 base=$(basename "$file" .json)
@@ -125,6 +185,39 @@ fi
 mdir=$(cd "$(dirname "$file")" && pwd)
 if has name && [ -e "$mdir/themes/$name.json" ]; then
   bad "name \"$name\" is also a theme (manifests/themes/$name.json)"
+fi
+# Listing rules for the name (the name pattern is checked above).
+if has name && [[ $name =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
+  IFS=- read -ra ntoks <<<"$name"
+  for t in "${ntoks[@]}"; do
+    if inlist "$banned_tokens" "$t"; then bad "name \"$name\" contains the banned word \"$t\""; fi
+  done
+  if [ "$fpx" -eq 0 ]; then
+    if [ "$reserved_flagged" -eq 0 ] && inlist "$reserved_names" "$name"; then
+      bad "name \"$name\" is reserved"
+    fi
+    if brand_listed "${ntoks[0]}" && ! brand_owned "${ntoks[0]}" "$owner"; then
+      bad "name must not start with the brand \"${ntoks[0]}\""
+    fi
+  fi
+  # Look-alikes: other manifests and, unless first-party exempt, reserved names.
+  nkey=$(lkey "$name")
+  look() { # look <other name>
+    [ "$1" != "$name" ] || return 0
+    if [ "$(lkey "$1")" = "$nkey" ] || lev1 "$name" "$1"; then bad "name \"$name\" looks like \"$1\""; fi
+  }
+  for sib in "$mdir"/*.json "$mdir"/themes/*.json; do
+    [ -e "$sib" ] || continue
+    sname=$(basename "$sib" .json)
+    [ "$sname" != "$base" ] && [ "$sname" != schema ] || continue
+    [[ $sname =~ ^[a-z][a-z0-9-]{1,39}$ ]] || continue
+    look "$sname"
+  done
+  if [ "$fpx" -eq 0 ]; then
+    while read -r r; do
+      if [[ $r =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then look "$r"; fi
+    done <<<"$reserved_names"
+  fi
 fi
 # file:/// repos exist only for the offline tests of the mirror script.
 if has repo && ! [[ $repo =~ ^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] \
