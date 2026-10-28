@@ -292,6 +292,15 @@ nm reject g00gle-sync "Sync G00gle" 'name must not start with the brand "google"
 nm reject checkout "Str1pe checkout" 'title must not start with the brand "stripe"'
 nm accept viewer-3d "Viewer 3D" ""
 nm accept five-sync "Five Sync 5g" ""
+# Default_Ignorable fillers, non-ASCII domains and dash-run separators.
+if [ "$(jq -n '"\u3164" | test("\\p{Default_Ignorable_Code_Point}")' 2>/dev/null)" = true ]; then ok "oniguruma knows Default_Ignorable_Code_Point"
+else no "oniguruma lacks Default_Ignorable_Code_Point (the validator would reject every title and description)"; fi
+for cp in '\u3164' '\u115f' '\u1160' '\uffa0'; do
+  nm reject acme-sync "Acme$(printf "$cp")Sync" "invisible characters"
+done
+nm reject acme-sync "Acme -- Sync -- Notes" "more than one separator"
+nm accept acme-sync "Acme -- Sync" ""
+nm accept acme-sync "Acme--Sync" ""
 # A spaced hyphen is a separator too.
 nm reject leads "Leads - HubSpot - Zapier - Mailchimp" "more than one separator"
 nm accept acme-sync "Acme - Sync" ""
@@ -385,6 +394,13 @@ rd reject "variant brands counted" '"Works with str1pe, g00gle, hubspot and zapi
 rd reject "variant brands count once per brand" '"Works with str1pe, stripe, g00gle, hubspot, zapier."' "names more than 3 brands"
 rd accept "digit tokens are not brands" '"Rated 5g 2024 3d 10 135 s3 a1 for sites."'
 rd accept "variant of one brand twice" '"Works with str1pe and stripe and g00gle and hubspot."'
+for cp in '\u3164' '\u115f' '\u1160' '\uffa0'; do
+  rd reject "filler $cp in description" "\"Adds a calendar$(printf "$cp")sync to a site.\"" "invisible characters"
+done
+rd reject "non-ASCII label before the dot" "\"Visit caf$(printf '\u00e9').com for help today.\"" "must not contain a URL or domain"
+rd reject "CJK label before the dot" "\"See $(printf '\u4f8b\u3048').com for the docs.\"" "must not contain a URL or domain"
+rd reject "non-ASCII TLD" "\"Docs at example.$(printf '\u0440\u0444') for you.\"" "must not contain a URL or domain"
+rd accept "prose with e.g." '"Works with e.g tools and v1.0x of the site"'
 rd accept "plain sentence" '"Adds a contact page to a site."'
 rd accept "two sentences" '"Adds a contact page. Works with any theme."'
 rd accept "free and plugin allowed" '"A free plugin that adds a contact page."'

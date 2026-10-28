@@ -141,8 +141,10 @@ fold_def='def fold:
       else $c end)
   | flatten | implode | ascii_downcase;
 '
-# Emoji, symbols and invisible characters (not \p{Emoji}: that is true for digits).
-unsafe_chars_filter='$t | test("\\p{Cf}|\\p{Co}|\\p{Cs}|\\p{So}|\\p{Sk}|\\p{Extended_Pictographic}|\\p{Emoji_Presentation}")'
+# Emoji, symbols and invisible characters (not \p{Emoji}: that is true for digits). Default
+# ignorables cover the fillers (U+3164, U+115F, U+1160, U+FFA0); an oniguruma without the
+# property makes jq fail and the check reject. keep in sync with Hatamoto core registry/build-community.sh
+unsafe_chars_filter='$t | test("\\p{Cf}|\\p{Co}|\\p{Cs}|\\p{So}|\\p{Sk}|\\p{Extended_Pictographic}|\\p{Emoji_Presentation}|\\p{Default_Ignorable_Code_Point}")'
 
 # field <name>: the string value, or empty when absent or not a string.
 field() { jq -r --arg k "$1" 'if (.[$k] | type) == "string" then .[$k] else "" end' "$file"; }
@@ -295,7 +297,8 @@ if has title; then
     if jt "$unsafe_chars_filter"; then
       bad "title must not contain emoji, symbols or invisible characters"
     fi
-    if jt '[$t | scan("[:,&/|+]| - ")] | length > 1'; then
+    # keep in sync with Hatamoto core registry/build-community.sh (a run of 2+ hyphens is one separator)
+    if jt '[$t | scan("[:,&/|+]| - |--+")] | length > 1'; then
       bad "title \"$title\" has more than one separator (: , & / | + and a spaced hyphen)"
     fi
     if jt '$t | test("[\\[\\](){}<>]|\\p{Ps}|\\p{Pe}")'; then
@@ -423,7 +426,9 @@ if [ "$remote" -eq 1 ]; then
     if jd '[$t | scan("[.!?。！？]")] | length > 2'; then
       bad "plugin.json description must have at most two sentence terminators"
     fi
-    if jd '$t | test("://|www\\.|[A-Za-z0-9-]+[.\u3002\uFF0E\uFF61\u2024][A-Za-z]{2,}"; "i")'; then
+    # keep in sync with Hatamoto core registry/build-community.sh (domain-like tokens: any script around an ASCII dot; the
+    # CJK full stop and other dot-likes keep ASCII labels, or a Japanese sentence end would count)
+    if jd '$t | test("://|www\\.|[\\p{L}\\p{N}-]+[.]\\p{L}{2,}|[A-Za-z0-9-]+[\u3002\uFF0E\uFF61\u2024][A-Za-z]{2,}"; "i")'; then
       bad "plugin.json description must not contain a URL or domain"
     fi
     if jd '$t | test("\\p{M}|[\uFF00-\uFFEF]") or ($t | test("^[\\p{L}\\p{N} \u0021-\u007E\u3001\u3002\u2019]*$") | not)'; then
