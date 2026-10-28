@@ -252,6 +252,9 @@ nm reject pay-1 "$(printf '\u0261oogle') 1" 'must not start with the brand "goog
 nm reject acme-sync "Acme Sync PREM$(printf '\u0130')UM" 'banned word "premium"'
 nm reject name-1 "Other 1" "share a word"
 nm accept name-1 "Name 1" ""
+# A brand is refused as a prefix of the first name token and of the first title word.
+nm reject stripecheckout "Stripecheckout" 'title must not start with the brand "stripe"'
+nm reject stripecheckout "Stripecheckout" 'name must not start with the brand "stripe"'
 # First-party titles still get the character, script and word rules, but need not share a word.
 tt accept "Google Tag Manager" fp
 tt accept "$(printf '\u65e5\u672c\u8a9e\u306e\u30bf\u30a4\u30c8\u30eb\u30fc')" fp

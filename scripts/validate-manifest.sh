@@ -72,7 +72,15 @@ brand_owned() {
   done <<<"$brands"
   return 1
 }
-# brand_listed <word>: the word is a brand in brands.txt.
+# brand_match <word>: print the brand in brands.txt that the word starts with, if any.
+brand_match() {
+  local b rest
+  while read -r b rest; do
+    if [ -n "$b" ] && [[ $1 == "$b"* ]]; then printf '%s' "$b"; return 0; fi
+  done <<<"$brands"
+  return 1
+}
+# brand_listed <word>: the word is exactly a brand in brands.txt.
 brand_listed() {
   local b rest
   while read -r b rest; do [ "$b" = "$1" ] && return 0; done <<<"$brands"
@@ -218,8 +226,8 @@ if has name && [[ $name =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
     if [ "$reserved_flagged" -eq 0 ] && inlist "$reserved_names" "$name"; then
       bad "name \"$name\" is reserved"
     fi
-    if brand_listed "${ntoks[0]}" && ! brand_owned "${ntoks[0]}" "$owner"; then
-      bad "name must not start with the brand \"${ntoks[0]}\""
+    if b=$(brand_match "${ntoks[0]}") && ! brand_owned "$b" "$owner"; then
+      bad "name must not start with the brand \"$b\""
     fi
   fi
   # Look-alikes: other manifests and, unless first-party exempt, reserved names.
@@ -301,8 +309,8 @@ if has title; then
       if inlist "$banned_words" "$w"; then bad "title contains the banned word \"$w\""; fi
     done <<<"$title_words"
     if [ "$fpx" -eq 0 ]; then
-      if [ -n "$first_word" ] && brand_listed "$first_word" && ! brand_owned "$first_word" "$owner"; then
-        bad "title must not start with the brand \"$first_word\""
+      if [ -n "$first_word" ] && b=$(brand_match "$first_word") && ! brand_owned "$b" "$owner"; then
+        bad "title must not start with the brand \"$b\""
       fi
       # The title must share an alphanumeric word with the name.
       shared=0
