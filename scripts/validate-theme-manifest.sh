@@ -3,6 +3,7 @@
 #
 # The rules mirror schemas/theme-manifest.schema.json and the registry build
 # (registry/build-community-themes.sh in the Hatamoto core repo); keep them in sync.
+# The optional about and features keys follow check_about_features there.
 # Reserved names come from ../policy/reserved-names.txt next to this script; a missing,
 # unreadable or empty list rejects. The theme build still has a hardcoded reserved list and
 # will read the same file in a follow-up. --remote (CI) also fetches the source and checks that
@@ -94,10 +95,58 @@ lev1() {
 # keep in sync with scripts/validate-manifest.sh and Hatamoto core registry/build-community.sh
 lkey() { printf '%s' "$1" | tr -d '-' | tr '0135' 'oles'; }
 
+# Emoji, symbols and invisible characters; the filter is a copy of the one in
+# scripts/validate-manifest.sh (it explains each class). An oniguruma without a property makes
+# jq fail and the check reject.
+# keep in sync with scripts/validate-manifest.sh (unsafe_chars_filter)
+unsafe_chars_filter='$t | test("\\p{Cf}|\\p{Co}|\\p{Cs}|\\p{So}|\\p{Sk}|\\p{Extended_Pictographic}|\\p{Emoji_Presentation}|\\p{Default_Ignorable_Code_Point}|(?![\u0640\u3005\u3031-\u3035\u303B\u309D\u309E\u30FC-\u30FE])\\p{Lm}")'
+
+# check_about_features: the rules for the optional keys "about" (plain text, paragraphs
+# separated by one newline) and "features" (a list of short lines). jq reads the manifest file
+# itself (not through field, which drops NULs and trailing newlines); the only program text
+# spliced in is the script's own filter constant. A jq failure rejects.
+# keep in sync with Hatamoto core registry/build-community-themes.sh (check_about_features)
+# and scripts/validate-manifest.sh (same function body)
+check_about_features() {
+  local r line
+  r=$(jq -r '
+    def unsafe: '"${unsafe_chars_filter#\$t | }"';
+    def line_problem:
+      if test("[<>]") then "must not contain < or >"
+      elif (ascii_downcase | contains("://") or contains("www.")) then "must not contain a URL"
+      elif . != gsub("^\\s+|\\s+$"; "") then "must not start or end with whitespace"
+      elif unsafe then "must not contain emoji, symbols or invisible characters"
+      else empty end;
+    def has_control($keep): explode | any(. != $keep and (. < 32 or (. >= 127 and . <= 159)));
+    (if has("about") then
+      .about as $a
+      | if ($a | type) != "string" then "about must be a string"
+        elif ($a | length) < 1 or ($a | length) > 1500 then "about must be 1 to 1500 characters"
+        elif ($a | has_control(10)) then "about must not contain control characters other than a newline between paragraphs"
+        elif ($a | split("\n") | length) > 10 then "about must have at most 10 paragraphs"
+        elif ($a | split("\n") | any(. == "")) then "about must not have an empty paragraph"
+        else ($a | split("\n") | map(line_problem) | first) as $p | if $p then "about \($p)" else empty end end
+    else empty end),
+    (if has("features") then
+      .features as $l
+      | if ($l | type) != "array" or ($l | any(type != "string")) then "features must be a list of strings"
+        elif ($l | length) < 1 or ($l | length) > 8 then "features must list 1 to 8 items"
+        elif ($l | any(length < 1 or length > 120)) then "each feature must be 1 to 120 characters"
+        elif ($l | any(has_control(-1))) then "a feature must not contain control characters"
+        else ($l | map(line_problem) | first) as $p
+          | if $p then "a feature \($p)"
+            elif ($l | map(ascii_downcase) | unique | length) != ($l | length) then "features must not repeat an item"
+            else empty end end
+    else empty end)' "$file") || { bad "about and features could not be checked"; return; }
+  while IFS= read -r line; do
+    [ -z "$line" ] || bad "$line"
+  done <<<"$r"
+}
+
 field() { jq -r --arg k "$1" 'if (.[$k] | type) == "string" then .[$k] else "" end' "$file"; }
 has() { jq -e --arg k "$1" 'has($k)' "$file" >/dev/null; }
 
-extra=$(jq -r '[keys[] | select(IN("name","author","license","homepage","subdir","repo","commit","archive","sha256","title","archive_grant") | not)] | join(", ")' "$file")
+extra=$(jq -r '[keys[] | select(IN("name","author","license","homepage","subdir","repo","commit","archive","sha256","title","archive_grant","about","features") | not)] | join(", ")' "$file")
 [ -z "$extra" ] || bad "unknown field(s): $extra"
 
 for k in name author license archive_grant; do
@@ -233,6 +282,8 @@ if has name && [[ $name =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
     if [[ $r =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then look "$r"; fi
   done <<<"$reserved_names"
 fi
+
+check_about_features
 
 # Stop before touching the network if the manifest is not well formed.
 [ "$fail" -eq 0 ] || exit 1
