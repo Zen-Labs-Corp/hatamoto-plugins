@@ -3,7 +3,7 @@
 The community plugin registry for [Hatamoto](https://hatamoto.dev). Each file in
 `manifests/` pins one plugin, hosted in its author's own GitHub repo, to an exact
 commit. First-party plugins (`gtm`, `searchconsole`) are listed the same way, from
-repos under `github.com/zenlabscorp/`, with `tier: first-party` instead of an author. A merged manifest means the plugin is approved: the Hatamoto team builds
+folders of [`Zen-Labs-Corp/hatamoto-first-party`](https://github.com/Zen-Labs-Corp/hatamoto-first-party) (`subdir`), with `tier: first-party` instead of an author. A merged manifest means the plugin is approved: the Hatamoto team builds
 it from that commit, signs it with the Hatamoto key and publishes it. At merge a
 copy of the pinned source is also archived in a repo the project owns, so removing
 the author's repo does not remove an approved plugin. The copy is the source at
@@ -24,10 +24,10 @@ mirrored and need no SDK. Approved themes are listed on
 - [CONTRIBUTING-THEMES.md](CONTRIBUTING-THEMES.md): submit, update or remove one.
 - [manifests/themes/README.md](manifests/themes/README.md) and [schemas/theme-manifest.schema.json](schemas/theme-manifest.schema.json): the theme manifest format.
 - Open a theme pull request with the theme template:
-  `https://github.com/zenlabscorp/hatamoto-plugins/compare/main...your-branch?template=theme.md`
+  `https://github.com/Zen-Labs-Corp/hatamoto-plugins/compare/main...your-branch?template=theme.md`
 
 > **Status:** the Hatamoto SDK (`hatamoto.dev/sdk`) is public at
-> <https://github.com/zenlabscorp/hatamoto-sdk>, so plugins build outside the core
+> <https://github.com/Zen-Labs-Corp/hatamoto-sdk>, so plugins build outside the core
 > repository today. Community submissions, for plugins and themes, open when Hatamoto core goes public.
 
 ## Guides

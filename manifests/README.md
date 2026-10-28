@@ -31,10 +31,10 @@ with their own format and checks.
 | `archive_grant` | yes | must be the JSON value `true`: the author grants the Hatamoto project a perpetual, irrevocable right to archive, build, sign and redistribute the source at the pinned commit and its builds |
 | `sdk` | yes | SDK range you built against; must match `sdk` in `plugin.json`; declare `^0.11` unless your users run Hatamoto v0.31.0 or later (older hosts refuse `^0.12`) |
 | `homepage` | no | an `https://` link |
-| `tier` | no, maintainers only | the only allowed value is `first-party`; accepted only when `repo` is under `https://github.com/zenlabscorp/` (owner match is exact, case-insensitive) and `author` is absent. Community authors leave it out |
+| `tier` | no, maintainers only | the only allowed value is `first-party`; accepted only when `repo` is under `https://github.com/Zen-Labs-Corp/` (or the project's former GitHub owner, kept until nothing pins it; owner match is exact, case-insensitive) and `author` is absent. Community authors leave it out |
 
 The names `gtm` and `searchconsole` are accepted only as `first-party` manifests
-from `zenlabscorp`; `webhooks` and `hello` are reserved and never accepted.
+from `Zen-Labs-Corp` or `zenlabscorp`; `webhooks` and `hello` are reserved and never accepted.
 
 No other keys are allowed. The machine-readable rules are in
 [schema.json](schema.json); `scripts/validate-manifest.sh` enforces the same ones.

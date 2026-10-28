@@ -70,6 +70,9 @@ fp gtm Zen-Labs-Corp
 if "$v" "$tmp/gtm.json" >/dev/null 2>&1; then ok "first-party owner Zen-Labs-Corp accepted"; else no "first-party owner Zen-Labs-Corp accepted"; fi
 fp acme-seo zenlabscorp
 if "$v" "$tmp/acme-seo.json" >/dev/null 2>&1; then ok "first-party non-reserved name accepted"; else no "first-party non-reserved name accepted"; fi
+# The first-party monorepo: owner Zen-Labs-Corp, one plugin per subdir.
+jq --arg n gtm '.name = $n | .repo = "https://github.com/Zen-Labs-Corp/hatamoto-first-party" | .subdir = "plugins/gtm" | .tier = "first-party" | del(.author)' "$f/good.json" > "$tmp/gtm.json"
+if "$v" "$tmp/gtm.json" >/dev/null 2>&1; then ok "first-party owner Zen-Labs-Corp with subdir accepted"; else no "first-party owner Zen-Labs-Corp with subdir accepted"; fi
 # reject_fp <label> <want> <name> <jq filter over the first-party manifest> [owner]
 reject_fp() {
   local label=$1 want=$2 n=$3 filter=$4 owner=${5:-zenlabscorp} err
