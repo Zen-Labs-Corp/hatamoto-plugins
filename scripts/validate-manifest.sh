@@ -79,20 +79,27 @@ brand_owned() {
 # has_letter <word>: the word holds something other than digits, punctuation and spaces.
 # keep in sync with Hatamoto core registry/build-community.sh
 has_letter() { [[ $1 =~ [^0-9[:punct:][:space:]] ]]; }
-# bkey <word>: lkey with l folded to i too (lkey turns 1 into l, so str1pe needs this to meet stripe).
-# keep in sync with Hatamoto core registry/build-community.sh
-bkey() { lkey "$1" | tr l i; }
-# brand_match_lk <word> [exact]: print the brand whose bkey the bkey of the word starts with
+# brand_match_lk <word> [exact]: print the brand whose lkey the lkey of the word starts with
 # (or equals, with "exact"). Catches digit swaps and hyphens (str1pe, str-ipe); skips words
-# with no letter. keep in sync with Hatamoto core registry/build-community.sh
+# with no letter. A digit 1 reads as l or i, so a word holding a 1 is compared with l folded
+# to i on both sides; without a 1, l stays l (openal is not openai). A prefix match that
+# crosses a hyphen must end at a hyphen (str-ipe-x, not open-air for openai).
+# keep in sync with Hatamoto core registry/build-community.sh
 brand_match_lk() {
-  local w b rest bk
+  local w b rest bk fl=0 t acc=0 first ends=" "
+  local -a toks
   has_letter "$1" || return 1
-  w=$(bkey "$1")
+  [[ $1 == *1* ]] && fl=1
+  w=$(lkey "$1")
+  [ "$fl" -eq 0 ] || w=${w//l/i}
+  IFS=- read -ra toks <<<"$1"
+  first=${#toks[0]}
+  for t in "${toks[@]}"; do acc=$((acc + ${#t})); ends="$ends$acc "; done
   while read -r b rest; do
     [ -n "$b" ] || continue
-    bk=$(bkey "$b")
-    if [ "${2:-}" = exact ]; then [ "$w" = "$bk" ] || continue; else [[ $w == "$bk"* ]] || continue; fi
+    bk=$(lkey "$b")
+    [ "$fl" -eq 0 ] || bk=${bk//l/i}
+    if [ "${2:-}" = exact ]; then [ "$w" = "$bk" ] || continue; else [[ $w == "$bk"* ]] && { [ "${#bk}" -le "$first" ] || [[ $ends == *" ${#bk} "* ]]; } || continue; fi
     printf '%s' "$b"; return 0
   done <<<"$brands"
   return 1
@@ -330,8 +337,8 @@ if has title; then
     # Words: lowercase alphanumeric tokens ('#' kept so "#1" is a word).
     title_words=$(jq -nr --arg t "$title" "$fold_def"'$t | fold | scan("[\\p{L}\\p{N}#]+")') \
       || { bad "title could not be checked"; title_words=""; }
-    # The first token as written, with - . ' removed, so "Str-ipe" is not split into two words.
-    title_token=$(jq -nr --arg t "$title" "$fold_def"'$t | fold | split(" ")[0] | gsub("[-.\u0027\u2019]"; "")') \
+    # The first token as written, with . and ' turned into hyphens: "Str-ipe" is not two words.
+    title_token=$(jq -nr --arg t "$title" "$fold_def"'$t | fold | split(" ")[0] | gsub("[.\u0027\u2019]"; "-")') \
       || { bad "title could not be checked"; title_token=""; }
     first_word=""
     while read -r w; do

@@ -292,6 +292,13 @@ nm reject g00gle-sync "Sync G00gle" 'name must not start with the brand "google"
 nm reject checkout "Str1pe checkout" 'title must not start with the brand "stripe"'
 nm reject sync-tool "Str-ipe Sync Tool" 'title must not start with the brand "stripe"'
 nm reject sync-tool "S.tripe Sync Tool" 'title must not start with the brand "stripe"'
+nm accept open-alerts "Open Alerts" ""
+nm accept openal-player "OpenAL Player" ""
+nm accept open-air-events "Open Air Events" ""
+nm accept open-air-events "Open-Air Events" ""
+nm reject str-ipe-x "Str-ipe-x Sync" 'title must not start with the brand "stripe"'
+nm reject open-ai-tool "Open Ai Tool" 'name must not start with the brand "openai"'
+nm reject pay-1 "Str1pe 1" 'title must not start with the brand "stripe"'
 nm accept viewer-3d "Viewer 3D" ""
 nm accept five-sync "Five Sync 5g" ""
 # Default_Ignorable fillers, non-ASCII domains and dash-run separators.
@@ -396,6 +403,7 @@ rd reject "variant brands counted" '"Works with str1pe, g00gle, hubspot and zapi
 rd reject "variant brands count once per brand" '"Works with str1pe, stripe, g00gle, hubspot, zapier."' "names more than 3 brands"
 rd reject "brands split by hyphens" '"Works with str-ipe, g-oogle, hub-spot and zap-ier."' "names more than 3 brands"
 rd reject "brands split by apostrophes" "\"Works with str$(printf '\u2019')ipe, g$(printf '\u2019')oogle, hub$(printf '\u2019')spot and zap$(printf '\u2019')ier.\"" "names more than 3 brands"
+rd accept "openal is not the brand openai" '"Uses openal, stripe, google and hubspot for audio"'
 rd accept "digit tokens are not brands" '"Rated 5g 2024 3d 10 135 s3 a1 for sites."'
 rd accept "variant of one brand twice" '"Works with str1pe and stripe and g00gle and hubspot."'
 for cp in '\u3164' '\u115f' '\u1160' '\uffa0'; do
