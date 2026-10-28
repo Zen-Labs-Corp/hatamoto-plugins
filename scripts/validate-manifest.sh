@@ -341,8 +341,8 @@ if has title; then
     # Words: lowercase alphanumeric tokens ('#' kept so "#1" is a word).
     title_words=$(jq -nr --arg t "$title" "$fold_def"'$t | fold | scan("[\\p{L}\\p{N}#]+")') \
       || { bad "title could not be checked"; title_words=""; }
-    # The first token as written, with . and ' turned into hyphens: "Str-ipe" is not two words.
-    title_token=$(jq -nr --arg t "$title" "$fold_def"'$t | fold | split(" ")[0] | gsub("[.\u0027\u2019]"; "-")') \
+    # The first token as written (cut at a space or a title separator), with . and ' turned into hyphens: "Str-ipe" is not two words.
+    title_token=$(jq -nr --arg t "$title" "$fold_def"'$t | fold | split(" ")[0] | split("[,:!?&/|+]"; null)[0] | gsub("[.\u0027\u2019]"; "-")') \
       || { bad "title could not be checked"; title_token=""; }
     first_word=""
     while read -r w; do

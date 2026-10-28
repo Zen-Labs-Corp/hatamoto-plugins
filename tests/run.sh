@@ -296,6 +296,11 @@ nm accept open-alerts "Open Alerts" ""
 nm accept openal-player "OpenAL Player" ""
 nm accept open-air-events "Open Air Events" ""
 nm accept open-air-events "Open-Air Events" ""
+nm reject sync-tool "Str-ipe: Sync Tool" 'title must not start with the brand "stripe"'
+nm reject sync-tool "Str-ipe, Sync Tool" 'title must not start with the brand "stripe"'
+nm reject sync-tool "Str-ipe/Sync Tool" 'title must not start with the brand "stripe"'
+nm accept open-air-events "Open-Air Events" ""
+nm accept open-air-events "Open Air: Events" ""
 nm reject str-ipe-x "Str-ipe-x Sync" 'title must not start with the brand "stripe"'
 nm reject open-ai-tool "Open Ai Tool" 'name must not start with the brand "openai"'
 nm reject pay-1 "Str1pe 1" 'title must not start with the brand "stripe"'
