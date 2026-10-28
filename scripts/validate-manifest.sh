@@ -98,6 +98,17 @@ jv() {
   r=$(jq -n --arg t "$v" "$@" "$f") || { bad "$l could not be checked"; return 1; }
   [ "$r" = true ]
 }
+# fold: look-alike letters (Cyrillic, Greek, a few Latin) to ASCII, for the word and brand
+# comparisons only. Pairs of code points: look-alike, ASCII letter.
+fold_def='def fold:
+  ([[1072,97],[1074,98],[1077,101],[1109,115],[1110,105],[1112,106],[1082,107],[1084,109],[1085,104],[1086,111],[1088,112],[1089,99],[1090,116],[1091,121],[1093,120],[1231,108],
+    [1040,97],[1042,98],[1045,101],[1029,115],[1030,105],[1032,106],[1050,107],[1052,109],[1053,104],[1054,111],[1056,112],[1057,99],[1058,116],[1059,121],[1061,120],[1216,108],
+    [959,111],[945,97],[949,101],[953,105],[954,107],[957,118],[961,112],[964,116],[965,117],[967,120],
+    [927,111],[913,97],[917,101],[921,105],[922,107],[925,110],[929,112],[932,116],[933,121],[935,120],[914,98],[918,122],[919,104],[924,109],
+    [609,103],[305,105],[304,105],[593,97]]
+   | map({(.[0] | tostring): .[1]}) | add) as $m
+  | explode | map($m[tostring] // .) | implode | ascii_downcase;
+'
 # Emoji, symbols and invisible characters (not \p{Emoji}: that is true for digits).
 unsafe_chars_filter='$t | test("\\p{Cf}|\\p{Co}|\\p{Cs}|\\p{So}|\\p{Sk}|\\p{Extended_Pictographic}|\\p{Emoji_Presentation}")'
 
@@ -281,7 +292,7 @@ if has title; then
       *" "*) bad "title mixes scripts: $scripts" ;;
     esac
     # Words: lowercase alphanumeric tokens ('#' kept so "#1" is a word).
-    title_words=$(jq -nr --arg t "$title" '$t | ascii_downcase | scan("[\\p{L}\\p{N}#]+")') \
+    title_words=$(jq -nr --arg t "$title" "$fold_def"'$t | fold | scan("[\\p{L}\\p{N}#]+")') \
       || { bad "title could not be checked"; title_words=""; }
     first_word=""
     while read -r w; do
@@ -298,7 +309,8 @@ if has title; then
       if [[ $name =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
         IFS=- read -ra ntoks <<<"$name"
         while read -r w; do
-          for t in "${ntoks[@]}"; do [ "$w" = "$t" ] && shared=1; done
+          # A word made of digits only does not count.
+          for t in "${ntoks[@]}"; do [ "$w" = "$t" ] && [[ $w =~ [^0-9] ]] && shared=1; done
         done <<<"$(jq -nr --arg t "$title" '$t | ascii_downcase | scan("[\\p{L}\\p{N}]+")' || true)"
       fi
       [ "$shared" -eq 1 ] || bad "title must share a word with the name"
@@ -374,6 +386,9 @@ if [ "$remote" -eq 1 ]; then
     if jd '$t | test("://|www\\.|[A-Za-z0-9-]+\\.[A-Za-z]{2,}"; "i")'; then
       bad "plugin.json description must not contain a URL or domain"
     fi
+    if jd '$t | test("\\p{M}|[\uFF00-\uFFEF]") or ($t | test("^[\\p{L}\\p{N} \u0021-\u007E\u3001\u3002\u2019]*$") | not)'; then
+      bad "plugin.json description may contain only letters, digits, spaces, ASCII punctuation and 。 、 (no combining marks, fullwidth forms or symbols)"
+    fi
     if jd "$unsafe_chars_filter"; then
       bad "plugin.json description must not contain emoji, symbols or invisible characters"
     fi
@@ -382,7 +397,7 @@ if [ "$remote" -eq 1 ]; then
     fi
     dnorm=$(jq -nr --arg t "$pdesc" '$t | ascii_downcase | gsub("^\\s+|\\s+$"; "")') || dnorm=""
     if inlist "$placeholders" "$dnorm"; then bad "plugin.json description is a placeholder"; fi
-    desc_words=$(jq -nr --arg t "$pdesc" '$t | ascii_downcase | scan("[\\p{L}\\p{N}#]+")') \
+    desc_words=$(jq -nr --arg t "$pdesc" "$fold_def"'$t | fold | scan("[\\p{L}\\p{N}#]+")') \
       || { bad "description could not be checked"; desc_words=""; }
     seen_brands=" "
     nbrands=0

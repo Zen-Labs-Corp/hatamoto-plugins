@@ -238,6 +238,20 @@ tt reject "Good Caf$(printf 'e\u0301')"
 tt reject "Good $(printf '\uff42\uff45\uff53\uff54')"
 tt reject "Good Tools $(printf '\u2605')"
 tt reject "Good $(printf '\u0928\u092e\u0938\u094d\u0924\u0947')"
+# Look-alike letters and digit-only words: a title is compared after folding to ASCII.
+nm() { # nm <accept|reject> <name> <title> <want>
+  jq --arg n "$2" --arg t "$3" '.name = $n | .title = $t' "$f/good.json" > "$tmp/tt/$2.json"
+  if err=$("$v" "$tmp/tt/$2.json" 2>&1 >/dev/null); then [ "$1" = accept ] && ok "title accepted: $3" || no "title accepted: $3"
+  elif [ "$1" = accept ]; then no "title accepted: $3: $err"
+  elif [[ $err == *"$4"* ]]; then ok "title rejected: $3"
+  else no "title rejected: $3: $err"; fi
+}
+mkdir -p "$tmp/tt"
+nm reject pay-1 "$(printf '\u0430\u0440\u0440\u04cf\u0435') 1" "share a word"
+nm reject pay-1 "$(printf '\u0261oogle') 1" 'must not start with the brand "google"'
+nm reject acme-sync "Acme Sync PREM$(printf '\u0130')UM" 'banned word "premium"'
+nm reject name-1 "Other 1" "share a word"
+nm accept name-1 "Name 1" ""
 # First-party titles still get the character, script and word rules, but need not share a word.
 tt accept "Google Tag Manager" fp
 tt accept "$(printf '\u65e5\u672c\u8a9e\u306e\u30bf\u30a4\u30c8\u30eb\u30fc')" fp
@@ -310,6 +324,14 @@ judge=$(awk '/^  judge:/{on=1;print;next} on && /^  [a-z]+:/{exit} on{print}' "$
 if [ -n "$judge" ] && ! grep -Eq 'tests/|scripts/validate-(theme-)?manifest\.sh "\$f"|scripts/check' <<<"$judge"; then ok "judge job runs no pull request code"; else no "judge job runs no pull request code"; fi
 if grep -q 'diff-filter=AMRT' <<<"$judge" && grep -q '100644' <<<"$judge"; then ok "judge job lists type changes and requires regular files"; else no "judge job lists type changes and requires regular files"; fi
 if grep -q 'exit 1' <<<"$judge" && ! grep -q 'fetch_trusted\|return 1\|return 0' <<<"$judge"; then ok "judge job stops when a base file is missing"; else no "judge job stops when a base file is missing"; fi
+
+# Description look-alikes: combining marks, fullwidth forms and other symbols are refused.
+rd reject "combining marks" "\"Fr$(printf '\u0301')ee and pr$(printf '\u0301')emium tooling for your team\"" "may contain only"
+rd reject "fullwidth letters" "\"$(printf '\uff26\uff52\uff45\uff45') tooling for your team and your site\"" "may contain only"
+rd reject "dot leader" "\"Visit example$(printf '\u2024')com for the page now\"" "may contain only"
+rd reject "Cyrillic brand look-alike" "\"Works with Stripe, PayPal, Slack, N$(printf '\u043e')tion and Z$(printf '\u0430')pier\"" "more than 3 brands"
+rd reject "Cyrillic banned word" "\"The b$(printf '\u0435')st contact page for your site\"" 'banned word "best"'
+rd accept "apostrophe and dash" '"Adds a contact page, it\u0027s fast - and simple."'
 
 # scripts/check-gomod.sh: plain-module rules of the registry build.
 if command -v go >/dev/null; then
