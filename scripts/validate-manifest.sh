@@ -124,8 +124,8 @@ jv() {
   r=$(jq -n --arg t "$v" "$@" "$f") || { bad "$l could not be checked"; return 1; }
   [ "$r" = true ]
 }
-# fold: look-alike letters (Cyrillic, Greek, Latin variants, maths alphanumerics, ligatures,
-# Roman numerals) to ASCII, for the word and brand comparisons only. Pairs of code points:
+# fold: look-alike letters (Cyrillic, Greek, Latin variants, maths alphanumerics and their
+# Letterlike Symbols holes, small capitals, ligatures, Roman numerals) to ASCII, for the word and brand comparisons only. Pairs of code points:
 # look-alike, ASCII letter. keep in sync with Hatamoto core registry/build-community.sh
 fold_def='def fold:
   ([[1072,97],[1074,98],[1077,101],[1109,115],[1110,105],[1112,106],[1082,107],[1084,109],[1085,104],[1086,111],[1088,112],[1089,99],[1090,116],[1091,121],[1093,120],[1231,108],
@@ -135,6 +135,8 @@ fold_def='def fold:
     [609,103],[305,105],[304,105],[593,97],
     [383,115],[8490,107],[8491,97],
     [7424,97],[7427,98],[7428,99],[7429,100],[7431,101],[7434,106],[7435,107],[7437,109],[7439,111],[7448,112],[7451,116],[7452,117],[7456,118],[7457,119],[7458,122],
+    [8458,103],[8459,104],[8460,104],[8461,104],[8462,104],[8464,105],[8465,105],[8466,108],[8467,108],[8469,110],[8473,112],[8474,113],[8475,114],[8476,114],[8477,114],[8484,122],[8488,122],[8492,98],[8493,99],[8495,101],[8496,101],[8497,102],[8499,109],[8500,111],[8450,99],[8505,105],[8517,100],[8518,100],[8519,101],[8520,105],[8521,106],
+    [42800,102],[42801,115],[42927,113],
     [665,98],[610,103],[668,104],[618,105],[671,108],[628,110],[640,114],[655,121]]
    | map({(.[0] | tostring): .[1]}) | add) as $m
   | explode | map(. as $c
@@ -149,9 +151,11 @@ fold_def='def fold:
   | flatten | implode | ascii_downcase;
 '
 # Emoji, symbols and invisible characters (not \p{Emoji}: that is true for digits). Default
-# ignorables cover the fillers (U+3164, U+115F, U+1160, U+FFA0); an oniguruma without the
-# property makes jq fail and the check reject. keep in sync with Hatamoto core registry/build-community.sh
-unsafe_chars_filter='$t | test("\\p{Cf}|\\p{Co}|\\p{Cs}|\\p{So}|\\p{Sk}|\\p{Extended_Pictographic}|\\p{Emoji_Presentation}|\\p{Default_Ignorable_Code_Point}")'
+# ignorables cover the fillers (U+3164, U+115F, U+1160, U+FFA0). Modifier letters (\p{Lm}) look
+# like small Latin letters; only the marks Japanese and Arabic text needs stay (U+0640, U+3005,
+# U+3031-3035, U+303B, U+309D, U+309E, U+30FC-30FE). An oniguruma without a property makes jq
+# fail and the check reject. keep in sync with Hatamoto core registry/build-community.sh
+unsafe_chars_filter='$t | test("\\p{Cf}|\\p{Co}|\\p{Cs}|\\p{So}|\\p{Sk}|\\p{Extended_Pictographic}|\\p{Emoji_Presentation}|\\p{Default_Ignorable_Code_Point}|(?![\u0640\u3005\u3031-\u3035\u303B\u309D\u309E\u30FC-\u30FE])\\p{Lm}")'
 
 # field <name>: the string value, or empty when absent or not a string.
 field() { jq -r --arg k "$1" 'if (.[$k] | type) == "string" then .[$k] else "" end' "$file"; }
