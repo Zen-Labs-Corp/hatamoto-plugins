@@ -391,7 +391,7 @@ if [ "$remote" -eq 1 ]; then
     if jd '[$t | scan("[.!?。！？]")] | length > 2'; then
       bad "plugin.json description must have at most two sentence terminators"
     fi
-    if jd '$t | test("://|www\\.|[A-Za-z0-9-]+\\.[A-Za-z]{2,}"; "i")'; then
+    if jd '$t | test("://|www\\.|[A-Za-z0-9-]+[.\u3002\uFF0E\uFF61\u2024][A-Za-z]{2,}"; "i")'; then
       bad "plugin.json description must not contain a URL or domain"
     fi
     if jd '$t | test("\\p{M}|[\uFF00-\uFFEF]") or ($t | test("^[\\p{L}\\p{N} \u0021-\u007E\u3001\u3002\u2019]*$") | not)'; then

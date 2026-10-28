@@ -314,6 +314,7 @@ rd reject "fullwidth terminators" '"サイトに追加します。簡単です�
 rd reject "URL scheme" '"Docs at http://example.com for the page"' "URL"
 rd reject "www" '"Visit www example and www.example for more"' "URL"
 rd reject "bare domain" '"Adds a contact page, see example.com now"' "URL"
+rd reject "ideographic full stop domain" "\"Get the full version at spamsite$(printf '\u3002')com today\"" "URL"
 rd reject "emoji" "\"Adds a contact page $(printf '\U0001F600') to a site\"" "emoji"
 rd reject "zero width" "\"Adds a contact$(printf '\u200b') page to a site\"" "emoji, symbols or invisible"
 rd reject "control character" '"Adds a contact page\nto a site today"' "control characters"
