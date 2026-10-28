@@ -466,6 +466,8 @@ if grep -q 'exit 1' <<<"$judge" && ! grep -q 'fetch_trusted\|return 1\|return 0'
 if ! awk '/^on:/{on=1;next} on && /^[a-z]/{exit} on{print}' "$wf" | grep -q 'paths:'; then ok "validate.yml has no pull_request path filter"; else no "validate.yml has no pull_request path filter"; fi
 if grep -q 'nothing to judge' <<<"$judge" && grep -q 'exit "\$status"' <<<"$judge"; then ok "judge prints a note and exits when nothing is relevant"; else no "judge prints a note and exits when nothing is relevant"; fi
 if grep -q 'sweep' <<<"$judge" && grep -q "ls-files -z -- 'manifests/\*.json'" <<<"$judge" && grep -q 'policy manifests/themes' <<<"$judge"; then ok "judge sweeps every plugin manifest on policy or theme changes"; else no "judge sweeps every plugin manifest on policy or theme changes"; fi
+# A type change of the path manifests itself (a symlink) lists as the bare entry "manifests".
+if grep -q '^ *manifests) echo "manifests must be a directory' <<<"$judge" && [ "$(grep -c '^ *manifests) echo "manifests must be a directory' "$wf")" -eq 2 ]; then ok "judge and build reject a bare manifests path"; else no "judge and build reject a bare manifests path"; fi
 if ! grep -q 'changed-manifests' <<<"$judge"; then ok "judge sweep uses an inline filter, not a pull request script"; else no "judge sweep uses an inline filter, not a pull request script"; fi
 
 # Description look-alikes: combining marks, fullwidth forms and other symbols are refused.

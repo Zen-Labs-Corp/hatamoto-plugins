@@ -91,6 +91,7 @@ jobs:
             case "$f" in
               manifests/README.md | manifests/schema.json | manifests/themes/README.md | manifests/themes/*.json) continue ;;
               manifests/*.json) ;;
+              manifests) echo "manifests must be a directory, not a symlink or a file" >&2; status=1; continue ;;
               manifests/*) echo "$f: only manifests/<name>.json files are allowed here" >&2; status=1; continue ;;
               *) continue ;;
             esac
@@ -156,6 +157,7 @@ jobs:
             case "$f" in
               manifests/README.md | manifests/schema.json | manifests/themes/README.md | manifests/themes/*.json) continue ;;
               manifests/*.json) ;;
+              manifests) echo "manifests must be a directory, not a symlink or a file" >&2; exit 1 ;;
               manifests/*) echo "$f: only manifests/<name>.json files are allowed here" >&2; exit 1 ;;
               *) continue ;;
             esac
