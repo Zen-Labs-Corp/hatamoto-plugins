@@ -107,6 +107,39 @@ else no "plugin rejects theme name: $err"; fi
 rm "$tmp/rev/manifests/themes/rev.json"
 if scripts/validate-manifest.sh "$tmp/rev/manifests/rev.json" >/dev/null 2>&1; then ok "plugin accepted without theme twin"; else no "plugin accepted without theme twin"; fi
 
+# Look-alikes: a theme name next to plugins, reserved names and sibling themes.
+la_theme() { # <label> <theme name> <expected substring|ok> [plugin name] [sibling theme name]
+  local d="$tmp/la-$1" err
+  rm -rf "$d"; mkdir -p "$d/manifests/themes"
+  jq --arg n "$2" '.name = $n' "$f/good-git-codeberg.json" > "$d/manifests/themes/$2.json"
+  [ -z "${4:-}" ] || echo '{}' > "$d/manifests/$4.json"
+  [ -z "${5:-}" ] || jq --arg n "$5" '.name = $n' "$f/good-git-codeberg.json" > "$d/manifests/themes/$5.json"
+  err=$("$v" "$d/manifests/themes/$2.json" 2>&1 >/dev/null); rc=$?
+  if [ "$3" = ok ]; then
+    if [ "$rc" -eq 0 ]; then ok "look-alike: $1 accepted"; else no "look-alike: $1 accepted: $err"; fi
+  elif [ "$rc" -ne 0 ] && [[ $err == *"$3"* ]]; then ok "look-alike: $1 rejected"
+  else no "look-alike: $1 rejected with \"$3\" (rc=$rc): $err"; fi
+}
+la_theme "one edit from a plugin" gtn 'looks like "gtm"' gtm
+la_theme "hyphen form of a plugin" g-tm 'looks like "gtm"' gtm
+la_theme "digit swap of a plugin" kum0 'looks like "kumo"' kumo
+la_theme "one edit from a hardcoded reserved name" webhook 'looks like "webhooks"'
+la_theme "one edit from a policy reserved name" formz 'looks like "forms"'
+la_theme "exact policy reserved name" forms 'is reserved'
+la_theme "one edit from a sibling theme" hanshl 'looks like "hanshi"' "" hanshi
+la_theme "unrelated name beside a plugin and a theme" kumoyama ok gtm hanshi
+
+# The theme validator reads policy/reserved-names.txt next to its own scripts/ dir; fail closed.
+mkdir -p "$tmp/np/scripts" "$tmp/ep/scripts" "$tmp/ep/policy"
+cp "$v" "$tmp/np/scripts/"; cp "$v" "$tmp/ep/scripts/"
+: > "$tmp/ep/policy/reserved-names.txt"
+for pc in np ep; do
+  want="missing policy"; [ "$pc" = ep ] && want="empty policy"
+  if err=$("$tmp/$pc/scripts/validate-theme-manifest.sh" "$f/good-git-codeberg.json" 2>&1 >/dev/null); then no "$pc policy rejected (exit 0)"
+  elif [[ $err == *"$want"* ]]; then ok "$pc policy rejected: $want"
+  else no "$pc policy rejected but stderr lacks \"$want\": $err"; fi
+done
+
 # License arrays must match the plugin validator.
 arr() { # <script>: the license allowlist as a sorted list
   bash -c 'src=$(sed -n "/^licenses=(/,/^done/p" "$1"); eval "$src"; printf "%s\n" "${licenses[@]}" | sort' _ "$1"

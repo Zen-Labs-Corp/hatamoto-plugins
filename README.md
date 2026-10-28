@@ -38,7 +38,14 @@ mirrored and need no SDK. Approved themes are listed on
 
 ## Checks
 
-Every pull request that touches `manifests/`, `scripts/`, `schemas/` or `tests/` runs `.github/workflows/validate.yml`.
+Every pull request runs `.github/workflows/validate.yml`, so its required `judge` check always reports.
+`judge` validates the plugin manifests a pull request changes, using the validator and `policy/` of the
+base branch. When a pull request changes `policy/` or `manifests/themes/`, it re-judges every plugin
+manifest with the base rules. The Hatamoto registry build for plugins (`registry/build-community.sh`
+in the Hatamoto core repository) reads `policy/` from a checkout of this repository; a missing,
+unreadable or empty list stops the build, so a bad policy change breaks publishing, not just PR
+checks. The theme build still uses its own reserved list and will read `reserved-names.txt` in a
+follow-up.
 Run the same checks locally:
 
 ```sh

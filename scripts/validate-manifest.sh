@@ -4,8 +4,8 @@
 # The rules mirror manifests/schema.json and the registry build script
 # (registry/build-community.sh in the Hatamoto core repo); keep the three in sync.
 # The listing rules (author, name, title, description) read their word lists from
-# ../policy next to this script. The registry build is to read the same files; it
-# is changed separately, so until then the listing rules are enforced here only.
+# ../policy next to this script. The registry build reads the same files from a
+# checkout of this repository, and a missing, unreadable or empty list stops it.
 # --remote (CI) also checks the repo is reachable, the commit exists, and the
 # plugin.json at that commit carries the manifest name. Manifest values are only
 # ever passed as quoted arguments, never evaluated.
@@ -76,18 +76,32 @@ brand_owned() {
   done <<<"$brands"
   return 1
 }
-# brand_match <word>: print the brand in brands.txt that the word starts with, if any.
-brand_match() {
-  local b rest
+# has_letter <word>: the word holds something other than digits, punctuation and spaces.
+# keep in sync with Hatamoto core registry/build-community.sh
+has_letter() { [[ $1 =~ [^0-9[:punct:][:space:]] ]]; }
+# brand_match_lk <word> [exact]: print the brand whose lkey the lkey of the word starts with
+# (or equals, with "exact"). Catches digit swaps and hyphens (str1pe, str-ipe); skips words
+# with no letter. A digit 1 reads as l or i, so a word holding a 1 is compared with l folded
+# to i on both sides; without a 1, l stays l (openal is not openai). A prefix match that
+# crosses a hyphen must end at a hyphen (str-ipe-x, not open-air for openai).
+# keep in sync with Hatamoto core registry/build-community.sh
+brand_match_lk() {
+  local w b rest bk fl=0 t acc=0 first ends=" "
+  local -a toks
+  has_letter "$1" || return 1
+  [[ $1 == *1* ]] && fl=1
+  w=$(lkey "$1")
+  [ "$fl" -eq 0 ] || w=${w//l/i}
+  IFS=- read -ra toks <<<"$1"
+  first=${#toks[0]}
+  for t in "${toks[@]}"; do acc=$((acc + ${#t})); ends="$ends$acc "; done
   while read -r b rest; do
-    if [ -n "$b" ] && [[ $1 == "$b"* ]]; then printf '%s' "$b"; return 0; fi
+    [ -n "$b" ] || continue
+    bk=$(lkey "$b")
+    [ "$fl" -eq 0 ] || bk=${bk//l/i}
+    if [ "${2:-}" = exact ]; then [ "$w" = "$bk" ] || continue; else [[ $w == "$bk"* ]] && { [ "${#bk}" -le "$first" ] || [[ $ends == *" ${#bk} "* ]]; } || continue; fi
+    printf '%s' "$b"; return 0
   done <<<"$brands"
-  return 1
-}
-# brand_listed <word>: the word is exactly a brand in brands.txt.
-brand_listed() {
-  local b rest
-  while read -r b rest; do [ "$b" = "$1" ] && return 0; done <<<"$brands"
   return 1
 }
 # lev1 <a> <b>: edit distance of at most 1.
@@ -110,19 +124,38 @@ jv() {
   r=$(jq -n --arg t "$v" "$@" "$f") || { bad "$l could not be checked"; return 1; }
   [ "$r" = true ]
 }
-# fold: look-alike letters (Cyrillic, Greek, a few Latin) to ASCII, for the word and brand
-# comparisons only. Pairs of code points: look-alike, ASCII letter.
+# fold: look-alike letters (Cyrillic, Greek, Latin variants, maths alphanumerics and their
+# Letterlike Symbols holes, small capitals, ligatures, Roman numerals) to ASCII, for the word and brand comparisons only. Pairs of code points:
+# look-alike, ASCII letter. keep in sync with Hatamoto core registry/build-community.sh
 fold_def='def fold:
   ([[1072,97],[1074,98],[1077,101],[1109,115],[1110,105],[1112,106],[1082,107],[1084,109],[1085,104],[1086,111],[1088,112],[1089,99],[1090,116],[1091,121],[1093,120],[1231,108],
     [1040,97],[1042,98],[1045,101],[1029,115],[1030,105],[1032,106],[1050,107],[1052,109],[1053,104],[1054,111],[1056,112],[1057,99],[1058,116],[1059,121],[1061,120],[1216,108],
     [959,111],[945,97],[949,101],[953,105],[954,107],[957,118],[961,112],[964,116],[965,117],[967,120],
     [927,111],[913,97],[917,101],[921,105],[922,107],[925,110],[929,112],[932,116],[933,121],[935,120],[914,98],[918,122],[919,104],[924,109],
-    [609,103],[305,105],[304,105],[593,97]]
+    [609,103],[305,105],[304,105],[593,97],
+    [383,115],[8490,107],[8491,97],
+    [7424,97],[7427,98],[7428,99],[7429,100],[7431,101],[7434,106],[7435,107],[7437,109],[7439,111],[7448,112],[7451,116],[7452,117],[7456,118],[7457,119],[7458,122],
+    [8458,103],[8459,104],[8460,104],[8461,104],[8462,104],[8464,105],[8465,105],[8466,108],[8467,108],[8469,110],[8473,112],[8474,113],[8475,114],[8476,114],[8477,114],[8484,122],[8488,122],[8492,98],[8493,99],[8495,101],[8496,101],[8497,102],[8499,109],[8500,111],[8450,99],[8505,105],[8517,100],[8518,100],[8519,101],[8520,105],[8521,106],
+    [42800,102],[42801,115],[42927,113],
+    [665,98],[610,103],[668,104],[618,105],[671,108],[628,110],[640,114],[655,121]]
    | map({(.[0] | tostring): .[1]}) | add) as $m
-  | explode | map($m[tostring] // .) | implode | ascii_downcase;
+  | explode | map(. as $c
+    | if $m[$c | tostring] then $m[$c | tostring]
+      elif $c >= 119808 and $c <= 120483 then (($c - 119808) % 52) as $n | (if $n < 26 then 65 + $n else 71 + $n end)
+      elif $c == 120484 then 105 elif $c == 120485 then 106
+      elif $c >= 120782 and $c <= 120831 then 48 + (($c - 120782) % 10)
+      elif $c >= 8544 and $c <= 8575 then (["i","ii","iii","iv","v","vi","vii","viii","ix","x","xi","xii","l","c","d","m"][($c - 8544) % 16] | explode)
+      elif $c >= 64256 and $c <= 64262 then (["ff","fi","fl","ffi","ffl","st","st"][$c - 64256] | explode)
+      elif $c == 306 or $c == 307 then [105, 106]
+      else $c end)
+  | flatten | implode | ascii_downcase;
 '
-# Emoji, symbols and invisible characters (not \p{Emoji}: that is true for digits).
-unsafe_chars_filter='$t | test("\\p{Cf}|\\p{Co}|\\p{Cs}|\\p{So}|\\p{Sk}|\\p{Extended_Pictographic}|\\p{Emoji_Presentation}")'
+# Emoji, symbols and invisible characters (not \p{Emoji}: that is true for digits). Default
+# ignorables cover the fillers (U+3164, U+115F, U+1160, U+FFA0). Modifier letters (\p{Lm}) look
+# like small Latin letters; only the marks Japanese and Arabic text needs stay (U+0640, U+3005,
+# U+3031-3035, U+303B, U+309D, U+309E, U+30FC-30FE). An oniguruma without a property makes jq
+# fail and the check reject. keep in sync with Hatamoto core registry/build-community.sh
+unsafe_chars_filter='$t | test("\\p{Cf}|\\p{Co}|\\p{Cs}|\\p{So}|\\p{Sk}|\\p{Extended_Pictographic}|\\p{Emoji_Presentation}|\\p{Default_Ignorable_Code_Point}|(?![\u0640\u3005\u3031-\u3035\u303B\u309D\u309E\u30FC-\u30FE])\\p{Lm}")'
 
 # field <name>: the string value, or empty when absent or not a string.
 field() { jq -r --arg k "$1" 'if (.[$k] | type) == "string" then .[$k] else "" end' "$file"; }
@@ -230,7 +263,7 @@ if has name && [[ $name =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
     if [ "$reserved_flagged" -eq 0 ] && inlist "$reserved_names" "$name"; then
       bad "name \"$name\" is reserved"
     fi
-    if b=$(brand_match "${ntoks[0]}") && ! brand_owned "$b" "$owner"; then
+    if b=$(brand_match_lk "$name") && ! brand_owned "$b" "$owner"; then
       bad "name must not start with the brand \"$b\""
     fi
   fi
@@ -275,7 +308,8 @@ if has title; then
     if jt "$unsafe_chars_filter"; then
       bad "title must not contain emoji, symbols or invisible characters"
     fi
-    if jt '[$t | scan("[:,&/|+]| - ")] | length > 1'; then
+    # keep in sync with Hatamoto core registry/build-community.sh (a run of 2+ hyphens is one separator)
+    if jt '[$t | scan("[:,&/|+]| - |--+")] | length > 1'; then
       bad "title \"$title\" has more than one separator (: , & / | + and a spaced hyphen)"
     fi
     if jt '$t | test("[\\[\\](){}<>]|\\p{Ps}|\\p{Pe}")'; then
@@ -307,6 +341,9 @@ if has title; then
     # Words: lowercase alphanumeric tokens ('#' kept so "#1" is a word).
     title_words=$(jq -nr --arg t "$title" "$fold_def"'$t | fold | scan("[\\p{L}\\p{N}#]+")') \
       || { bad "title could not be checked"; title_words=""; }
+    # The first token as written (cut at a space or a title separator), with . and ' turned into hyphens: "Str-ipe" is not two words.
+    title_token=$(jq -nr --arg t "$title" "$fold_def"'$t | fold | split(" ")[0] | split("[,:!?&/|+]"; null)[0] | gsub("[.\u0027\u2019]"; "-")') \
+      || { bad "title could not be checked"; title_token=""; }
     first_word=""
     while read -r w; do
       [ -n "$w" ] || continue
@@ -314,9 +351,12 @@ if has title; then
       if inlist "$banned_words" "$w"; then bad "title contains the banned word \"$w\""; fi
     done <<<"$title_words"
     if [ "$fpx" -eq 0 ]; then
-      if [ -n "$first_word" ] && b=$(brand_match "$first_word") && ! brand_owned "$b" "$owner"; then
-        bad "title must not start with the brand \"$b\""
-      fi
+      for w in "$first_word" "$title_token"; do
+        if [ -n "$w" ] && b=$(brand_match_lk "$w") && ! brand_owned "$b" "$owner"; then
+          bad "title must not start with the brand \"$b\""
+          break
+        fi
+      done
       # The title must share an alphanumeric word with the name.
       shared=0
       if [[ $name =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
@@ -373,6 +413,11 @@ if [ "$remote" -eq 1 ]; then
     echo "$file: no $path at commit $commit" >&2
     exit 1
   fi
+  # keep in sync with Hatamoto core registry/build-community.sh (check_description)
+  if ! printf '%s' "$pj" | jq -se 'length == 1 and (.[0] | type == "object" and (keys | all(test("^[a-z][a-z0-9_]*$"))))' >/dev/null 2>&1; then
+    echo "$file: plugin.json keys must be lowercase identifiers" >&2
+    exit 1
+  fi
   pname=$(printf '%s' "$pj" | jq -r '.name // empty' 2>/dev/null || true)
   if [ "$pname" != "$name" ]; then
     echo "$file: plugin.json name \"$pname\" does not match manifest name \"$name\"" >&2
@@ -398,7 +443,11 @@ if [ "$remote" -eq 1 ]; then
     if jd '[$t | scan("[.!?。！？]")] | length > 2'; then
       bad "plugin.json description must have at most two sentence terminators"
     fi
-    if jd '$t | test("://|www\\.|[A-Za-z0-9-]+[.\u3002\uFF0E\uFF61\u2024][A-Za-z]{2,}"; "i")'; then
+    # keep in sync with Hatamoto core registry/build-community.sh (domain-like tokens: any script around an ASCII dot;
+    # the ideographic full stop after a Latin letter or digit and before any letters, since IDNA reads it as a dot; the
+    # other dot-likes after ASCII only. A Kana or Han label before 。 stays allowed, and so does Han, Kana or Hangul
+    # right after it, so a Japanese sentence end is not a domain; known gaps: テスト。com and example。中国 are accepted)
+    if jd '$t | test("://|www\\.|[\\p{L}\\p{N}-]+[.]\\p{L}{2,}|[\\p{Latin}\\p{N}-]+\u3002(?:(?![\\p{Han}\\p{Hiragana}\\p{Katakana}\\p{Hangul}])\\p{L}){2,}|[A-Za-z0-9-]+[\uFF0E\uFF61\u2024][A-Za-z]{2,}"; "i")'; then
       bad "plugin.json description must not contain a URL or domain"
     fi
     if jd '$t | test("\\p{M}|[\uFF00-\uFFEF]") or ($t | test("^[\\p{L}\\p{N} \u0021-\u007E\u3001\u3002\u2019]*$") | not)'; then
@@ -414,18 +463,28 @@ if [ "$remote" -eq 1 ]; then
     if inlist "$placeholders" "$dnorm"; then bad "plugin.json description is a placeholder"; fi
     desc_words=$(jq -nr --arg t "$pdesc" "$fold_def"'$t | fold | scan("[\\p{L}\\p{N}#]+")') \
       || { bad "description could not be checked"; desc_words=""; }
+    # Whitespace tokens with - . ' removed, so "str-ipe" is one word again (brands only).
+    desc_joined=$(jq -nr --arg t "$pdesc" "$fold_def"'$t | fold | gsub("[-.\u0027\u2019]"; "") | scan("[\\p{L}\\p{N}#]+")') \
+      || { bad "description could not be checked"; desc_joined=""; }
     seen_brands=" "
     nbrands=0
+    count_brand() { # count_brand <word>: count each listed brand once
+      local b
+      if b=$(brand_match_lk "$1" exact) && [[ $seen_brands != *" $b "* ]]; then
+        seen_brands="$seen_brands$b "
+        nbrands=$((nbrands + 1))
+      fi
+    }
     while read -r w; do
       [ -n "$w" ] || continue
       if [ "$w" != free ] && [ "$w" != plugin ] && inlist "$banned_words" "$w"; then
         bad "plugin.json description contains the banned word \"$w\""
       fi
-      if brand_listed "$w" && [[ $seen_brands != *" $w "* ]]; then
-        seen_brands="$seen_brands$w "
-        nbrands=$((nbrands + 1))
-      fi
+      count_brand "$w"
     done <<<"$desc_words"
+    while read -r w; do
+      [ -n "$w" ] && count_brand "$w"
+    done <<<"$desc_joined"
     if [ "$nbrands" -gt 3 ]; then bad "plugin.json description names more than 3 brands"; fi
   fi
   [ "$fail" -eq 0 ] || exit 1

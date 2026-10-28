@@ -15,9 +15,17 @@ both `#` and `payments` would be read as brand owners. Every list except
 | `brands.txt` | `brand [owner ...]`: the brand may not start a name or title unless the repo owner is listed |
 | `placeholders.txt` | descriptions that are unfilled templates (whole line) |
 
-The validator reads these files from the base branch in CI. The registry build
-is to read the same files from a checkout of this repository; it does not yet.
-A missing file, or an empty list, makes validation fail. The look-alike check
+The validator reads these files from the base branch in CI. The Hatamoto registry
+build for plugins (`registry/build-community.sh` in the Hatamoto core repository)
+reads the same files from a checkout of this repository. A missing, unreadable or
+empty list makes validation fail and stops that build, so a bad policy change
+breaks publishing, not just PR checks. The theme build (`build-community-themes.sh`)
+does not read `policy/` yet: it keeps a hardcoded reserved list and will read
+`reserved-names.txt` in a follow-up. The theme validator here reads
+`reserved-names.txt` too, and its look-alike check (one character apart, or the same
+after folding hyphens and digit swaps) applies to theme names against plugin names,
+other themes and reserved names. The matching rules in the core build land in the
+Hatamoto repository as a follow-up; until then these validators are the stricter side. The look-alike check
 of a name against `reserved-names.txt` (one character apart) can reject ordinary
 words, for example `auto` (close to `auth`) or `logic` (close to `login`). Change policy in its own pull request, separate from
 manifest changes.

@@ -2,7 +2,10 @@
 # Validate one theme manifest. Usage: validate-theme-manifest.sh <manifests/themes/name.json> [--remote]
 #
 # The rules mirror schemas/theme-manifest.schema.json and the registry build
-# (keep them in sync). --remote (CI) also fetches the source and checks that
+# (registry/build-community-themes.sh in the Hatamoto core repo); keep them in sync.
+# Reserved names come from ../policy/reserved-names.txt next to this script; a missing,
+# unreadable or empty list rejects. The theme build still has a hardcoded reserved list and
+# will read the same file in a follow-up. --remote (CI) also fetches the source and checks that
 # theme.json carries the manifest name and a screenshot under assets/ of <= 2 MiB.
 # If HATAMOTO_BIN is set, the Go validator (`theme check ... --registry`) also runs.
 # Manifest values are only ever passed as quoted arguments, never evaluated.
@@ -63,6 +66,34 @@ if ! jq -e 'type == "object"' "$file" >/dev/null 2>&1; then
   exit 1
 fi
 
+# Reserved names come from policy/reserved-names.txt next to this script's scripts/ dir.
+# Fail closed, before any name check and before any network access.
+# keep in sync with Hatamoto core registry/build-community-themes.sh
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+pol=$here/../policy
+if [ ! -r "$pol/reserved-names.txt" ]; then bad "missing policy: reserved-names.txt"; exit 1; fi
+# plist <list>: entries, trimmed and lowercased, without blank lines and "# " comments.
+plist() {
+  jq -Rr 'ascii_downcase | gsub("\r"; "") | gsub("^\\s+|\\s+$"; "") | select(. != "" and . != "#" and (startswith("# ") | not))' "$pol/$1.txt"
+}
+reserved_names=$(plist reserved-names)
+[ -n "$reserved_names" ] || { bad "empty policy: reserved-names.txt"; exit 1; }
+# inlist <newline separated list> <word>: exact whole-line membership.
+inlist() { [[ $'\n'$1$'\n' == *$'\n'"$2"$'\n'* ]]; }
+# lev1 <a> <b>: edit distance of at most 1.
+# keep in sync with scripts/validate-manifest.sh and Hatamoto core registry/build-community.sh
+lev1() {
+  local a=$1 b=$2 i=0
+  [ "$a" = "$b" ] && return 0
+  while [ "$i" -lt "${#a}" ] && [ "$i" -lt "${#b}" ] && [ "${a:i:1}" = "${b:i:1}" ]; do i=$((i + 1)); done
+  a=${a:i}; b=${b:i}
+  while [ -n "$a" ] && [ -n "$b" ] && [ "${a: -1}" = "${b: -1}" ]; do a=${a%?}; b=${b%?}; done
+  [ "${#a}" -le 1 ] && [ "${#b}" -le 1 ]
+}
+# lkey <name>: hyphens removed, 0 1 3 5 folded to o l e s.
+# keep in sync with scripts/validate-manifest.sh and Hatamoto core registry/build-community.sh
+lkey() { printf '%s' "$1" | tr -d '-' | tr '0135' 'oles'; }
+
 field() { jq -r --arg k "$1" 'if (.[$k] | type) == "string" then .[$k] else "" end' "$file"; }
 has() { jq -e --arg k "$1" 'has($k)' "$file" >/dev/null; }
 
@@ -103,9 +134,13 @@ if has name && ! [[ $name =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
   bad "name must match ^[a-z][a-z0-9-]{1,39}\$"
 fi
 if has name; then
+  # keep in sync with Hatamoto core registry/build-community-themes.sh
   for reserved in default webhooks hello gtm searchconsole; do
     [ "$name" != "$reserved" ] || bad "name \"$name\" is reserved"
   done
+  if inlist "$reserved_names" "$name" && ! [[ $name =~ ^(default|webhooks|hello|gtm|searchconsole)$ ]]; then
+    bad "name \"$name\" is reserved"
+  fi
 fi
 base=$(basename "$file" .json)
 if has name && [ "$name" != "$base" ]; then
@@ -173,6 +208,30 @@ if [ "$(basename "$dir")" = "themes" ] && [ "$(basename "$(dirname "$dir")")" = 
   if has name && [ -e "$root/manifests/$name.json" ]; then
     bad "name \"$name\" is already used by a plugin (manifests/$name.json)"
   fi
+fi
+
+# Look-alikes of reserved names always; of plugins and sibling themes when the file sits in
+# <root>/manifests/themes/. Same filters and message as scripts/validate-manifest.sh.
+# keep in sync with Hatamoto core registry/build-community-themes.sh
+if has name && [[ $name =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
+  nkey=$(lkey "$name")
+  look() { # look <other name>
+    [ "$1" != "$name" ] || return 0
+    if [ "$(lkey "$1")" = "$nkey" ] || lev1 "$name" "$1"; then bad "name \"$name\" looks like \"$1\""; fi
+  }
+  if [ -n "${root:-}" ]; then
+    for other in "$root"/manifests/*.json "$dir"/*.json; do
+      [ -e "$other" ] || continue
+      oname=$(basename "$other" .json)
+      [ "$oname" != "$base" ] && [ "$oname" != schema ] || continue
+      [[ $oname =~ ^[a-z][a-z0-9-]{1,39}$ ]] || continue
+      look "$oname"
+    done
+  fi
+  for r in default webhooks hello gtm searchconsole; do look "$r"; done
+  while read -r r; do
+    if [[ $r =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then look "$r"; fi
+  done <<<"$reserved_names"
 fi
 
 # Stop before touching the network if the manifest is not well formed.

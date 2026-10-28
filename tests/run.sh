@@ -285,9 +285,45 @@ nm accept name-1 "Name 1" ""
 # A brand is refused as a prefix of the first name token and of the first title word.
 nm reject stripecheckout "Stripecheckout" 'title must not start with the brand "stripe"'
 nm reject stripecheckout "Stripecheckout" 'name must not start with the brand "stripe"'
+# Brand variants (digit swaps, hyphens) in names, titles and description words.
+nm reject str1pe-sync "Str1pe Sync" 'name must not start with the brand "stripe"'
+nm reject str-ipe "Str Ipe" 'name must not start with the brand "stripe"'
+nm reject g00gle-sync "Sync G00gle" 'name must not start with the brand "google"'
+nm reject checkout "Str1pe checkout" 'title must not start with the brand "stripe"'
+nm reject sync-tool "Str-ipe Sync Tool" 'title must not start with the brand "stripe"'
+nm reject sync-tool "S.tripe Sync Tool" 'title must not start with the brand "stripe"'
+nm accept open-alerts "Open Alerts" ""
+nm accept openal-player "OpenAL Player" ""
+nm accept open-air-events "Open Air Events" ""
+nm accept open-air-events "Open-Air Events" ""
+nm reject sync-tool "Str-ipe: Sync Tool" 'title must not start with the brand "stripe"'
+nm reject sync-tool "Str-ipe, Sync Tool" 'title must not start with the brand "stripe"'
+nm reject sync-tool "Str-ipe/Sync Tool" 'title must not start with the brand "stripe"'
+nm accept open-air-events "Open-Air Events" ""
+nm accept open-air-events "Open Air: Events" ""
+nm reject str-ipe-x "Str-ipe-x Sync" 'title must not start with the brand "stripe"'
+nm reject open-ai-tool "Open Ai Tool" 'name must not start with the brand "openai"'
+nm reject pay-1 "Str1pe 1" 'title must not start with the brand "stripe"'
+nm accept viewer-3d "Viewer 3D" ""
+nm accept five-sync "Five Sync 5g" ""
+# Default_Ignorable fillers, non-ASCII domains and dash-run separators.
+if [ "$(jq -n '"\u3164" | test("\\p{Default_Ignorable_Code_Point}")' 2>/dev/null)" = true ]; then ok "oniguruma knows Default_Ignorable_Code_Point"
+else no "oniguruma lacks Default_Ignorable_Code_Point (the validator would reject every title and description)"; fi
+for cp in '\u3164' '\u115f' '\u1160' '\uffa0'; do
+  nm reject acme-sync "Acme$(printf "$cp")Sync" "invisible characters"
+done
+nm reject acme-sync "Acme -- Sync -- Notes" "more than one separator"
+nm accept acme-sync "Acme -- Sync" ""
+nm accept acme-sync "Acme--Sync" ""
 # A spaced hyphen is a separator too.
 nm reject leads "Leads - HubSpot - Zapier - Mailchimp" "more than one separator"
 nm accept acme-sync "Acme - Sync" ""
+# Modifier letters fold to nothing useful, so they are refused; Japanese iteration marks stay.
+nm reject sync-tool "$(printf '\ua731\u1d1b\u0280\u026a\u1d18\u1d07') Sync Tool" 'title must not start with the brand "stripe"'
+nm reject sync-tool "$(printf '\u02e2\u1d57\u02b3\u2071\u1d56\u1d49') Sync Tool" "invisible characters"
+tt accept "$(printf '\u65e5\u3005\u30e1\u30e2\u309d\u30fc')" fp
+# A Hangul-only title with a Hangul filler passes the script rules, so only the filler rule refuses it.
+tt reject "$(printf '\ube14\ub85c\uadf8\u3164\ub3c4\uad6c')" fp "invisible characters"
 # First-party titles still get the character, script and word rules, but need not share a word.
 tt accept "Google Tag Manager" fp
 tt accept "$(printf '\u65e5\u672c\u8a9e\u306e\u30bf\u30a4\u30c8\u30eb\u30fc')" fp
@@ -315,21 +351,86 @@ if "$v" "$tmp/good.json" >/dev/null 2>&1; then ok "accepts nested subdir"; else 
 # Description rules: --remote reads plugin.json at the pinned commit (file:/// repos, offline).
 # rd <accept|reject> <label> <plugin.json description as JSON, or "-" for none> [want]
 rd() {
-  local want=$1 label=$2 desc=$3 msg=${4:-} dir="$tmp/rd/own/descy" err
+  local raw
+  if [ "$3" = "-" ]; then raw=$(jq -nc '{name: "descy", sdk: "^0.10"}')
+  else raw=$(jq -nc --argjson d "$3" '{name: "descy", sdk: "^0.10", description: $d}'); fi
+  rj "$1" "$2" "$raw" "${4:-}" description
+}
+# rj <accept|reject> <label> <raw plugin.json text> [want] [noun]: same fixture, raw plugin.json.
+rj() {
+  local want=$1 label=$2 raw=$3 msg=${4:-} noun=${5:-plugin.json} dir="$tmp/rd/own/descy" err
   rm -rf "$dir" "$tmp/rd/manifests"; mkdir -p "$dir" "$tmp/rd/manifests"
-  if [ "$desc" = "-" ]; then jq -n '{name: "descy", sdk: "^0.10"}' > "$dir/plugin.json"
-  else jq -n --argjson d "$desc" '{name: "descy", sdk: "^0.10", description: $d}' > "$dir/plugin.json"; fi
+  printf '%s' "$raw" > "$dir/plugin.json"
   git -C "$dir" init -q
   git -C "$dir" add -A
   git -C "$dir" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -q -m init
   jq --arg r "file://$dir" --arg c "$(git -C "$dir" rev-parse HEAD)" \
     '.name = "descy" | .repo = $r | .commit = $c | .author = "own" | .title = "Descy Tools"' "$f/good.json" > "$tmp/rd/manifests/descy.json"
   if err=$(HATAMOTO_ALLOW_FILE_REPOS=1 "$v" "$tmp/rd/manifests/descy.json" --remote 2>&1 >/dev/null); then
-    [ "$want" = accept ] && ok "description accepted: $label" || no "description accepted: $label"
-  elif [ "$want" = accept ]; then no "description accepted: $label: $err"
-  elif [[ $err == *"$msg"* ]]; then ok "description rejected: $label"
-  else no "description rejected: $label: $err"; fi
+    [ "$want" = accept ] && ok "$noun accepted: $label" || no "$noun accepted: $label"
+  elif [ "$want" = accept ]; then no "$noun accepted: $label: $err"
+  elif [[ $err == *"$msg"* ]]; then ok "$noun rejected: $label"
+  else no "$noun rejected: $label: $err"; fi
 }
+# plugin.json shape: an array or a non-lowercase top-level key is refused before .name is read.
+k='plugin.json keys must be lowercase identifiers'
+rj reject "array" '[]' "$k"
+rj reject "Description key" '{"name":"descy","sdk":"^0.10","Description":"A calendar sync tool"}' "$k"
+rj reject "Name key" '{"Name":"descy","sdk":"^0.10"}' "$k"
+rj reject "long-s key" '{"name":"descy","sdk":"^0.10","de\u017fcription":"A calendar sync tool"}' "$k"
+rj reject "string" '"deſcription"' "$k"
+rj reject "two values in the file" '{"Description":"spam"} {"name":"descy","sdk":"^0.10","description":"Adds a contact page to a site."}' "$k"
+rj accept "lowercase object" '{"name":"descy","sdk":"^0.10","description":"Adds a contact page to a site."}'
+# fold: maths alphanumerics, long s, Kelvin/Angstrom, small capitals, ligatures, Roman numerals.
+eval "$(sed -n '/^fold_def=/,/^'"'"'$/p' "$v")"
+fold_t() {
+  local got
+  got=$(jq -nr --arg t "$1" "$fold_def"'$t | fold' 2>&1)
+  if [ "$got" = "$2" ]; then ok "fold $1 -> $2"; else no "fold $1 -> $2 (got: $got)"; fi
+}
+fold_t "$(printf '\U1D42C\U1D42D\U1D42B\U1D422\U1D429\U1D41E')" stripe
+fold_t "$(printf '\U1D5A2')" c
+fold_t "$(printf '\U1D7CE\U1D7FF')" 09
+fold_t "$(printf '\u017f')" s
+fold_t "$(printf '\u212a')" k
+fold_t "$(printf '\u212b')" a
+fold_t "$(printf '\u1d00')" a
+fold_t "$(printf '\u0299\u0262\u029c\u026a\u029f\u0274\u0280\u028f')" bghilnry
+fold_t "$(printf '\ufb01')" fi
+fold_t "$(printf '\ufb02')" fl
+fold_t "$(printf '\ufb03')" ffi
+fold_t "$(printf '\u0133')" ij
+fold_t "$(printf '\u2171')" ii
+fold_t "$(printf '\u2172')" iii
+fold_t "$(printf '\u2173')" iv
+fold_t "$(printf '\u217a')" xi
+fold_t "$(printf '\u2170')" i
+fold_t "$(printf '\u212f\u210a\u210e\u2113\u2102\u210d\u2115\u2119\u211a\u211d\u2124\u212c\u2130\u2131\u210b\u2110\u2112\u2133\u211b\u212d\u210c\u2111\u211c\u2128\u2134')" eghlchnpqrzbefhilmrchirzo
+fold_t "$(printf '\ua730\ua731\ua7af')" fsq
+fold_t "Plain Text" "plain text"
+M=$(printf '\U1D42C\U1D42D\U1D42B\U1D422\U1D429\U1D41E')
+rd reject "maths-bold brand is the 4th" "\"Works with $M, google, hubspot and zapier.\"" "names more than 3 brands"
+rd reject "ligature brand" '"Works with cloud\ufb02are, stripe, google and hubspot."' "names more than 3 brands"
+rd reject "Kelvin and small-capital brand" "\"Works with $(printf 's\u1d1b\u0280ipe'), google, hubspot and tikto$(printf '\u212a').\"" "names more than 3 brands"
+rd reject "letterlike script banned word" "\"The $(printf '\U0001D4B7\u212f\U0001D4C8\U0001D4C9') calendar sync for sites.\"" 'banned word "best"'
+rd reject "letterlike brand" "\"Works with stripe, $(printf '\U0001D4F0\U0001D4F8\U0001D4F8\U0001D4F0\U0001D4F5\u212f'), hubspot and zapier.\"" "names more than 3 brands"
+rd reject "modifier letters in description" "\"Works with $(printf '\u02e2\u1d57\u02b3\u2071\u1d56\u1d49') for your site today.\"" "invisible characters"
+rd accept "Japanese iteration marks" "\"$(printf '\u65e5\u3005\u306e\u30e1\u30e2\u3092\u30b5\u30a4\u30c8\u306b\u8ffd\u52a0\u3057\u307e\u3059\u30fc\u3002\u7c21\u5358\u306b\u4f7f\u3048\u307e\u3059')\""
+rd reject "Kelvin brand" "\"Works with stripe, google, hubspot and tikto$(printf '\u212a').\"" "names more than 3 brands"
+rd reject "variant brands counted" '"Works with str1pe, g00gle, hubspot and zapier."' "names more than 3 brands"
+rd reject "variant brands count once per brand" '"Works with str1pe, stripe, g00gle, hubspot, zapier."' "names more than 3 brands"
+rd reject "brands split by hyphens" '"Works with str-ipe, g-oogle, hub-spot and zap-ier."' "names more than 3 brands"
+rd reject "brands split by apostrophes" "\"Works with str$(printf '\u2019')ipe, g$(printf '\u2019')oogle, hub$(printf '\u2019')spot and zap$(printf '\u2019')ier.\"" "names more than 3 brands"
+rd accept "openal is not the brand openai" '"Uses openal, stripe, google and hubspot for audio"'
+rd accept "digit tokens are not brands" '"Rated 5g 2024 3d 10 135 s3 a1 for sites."'
+rd accept "variant of one brand twice" '"Works with str1pe and stripe and g00gle and hubspot."'
+for cp in '\u3164' '\u115f' '\u1160' '\uffa0'; do
+  rd reject "filler $cp in description" "\"Adds a calendar$(printf "$cp")sync to a site.\"" "invisible characters"
+done
+rd reject "non-ASCII label before the dot" "\"Visit caf$(printf '\u00e9').com for help today.\"" "must not contain a URL or domain"
+rd reject "CJK label before the dot" "\"See $(printf '\u4f8b\u3048').com for the docs.\"" "must not contain a URL or domain"
+rd reject "non-ASCII TLD" "\"Docs at example.$(printf '\u0440\u0444') for you.\"" "must not contain a URL or domain"
+rd accept "prose with e.g." '"Works with e.g tools and v1.0x of the site"'
 rd accept "plain sentence" '"Adds a contact page to a site."'
 rd accept "two sentences" '"Adds a contact page. Works with any theme."'
 rd accept "free and plugin allowed" '"A free plugin that adds a contact page."'
@@ -344,7 +445,11 @@ rd reject "fullwidth terminators" '"サイトに追加します。簡単です�
 rd reject "URL scheme" '"Docs at http://example.com for the page"' "URL"
 rd reject "www" '"Visit www example and www.example for more"' "URL"
 rd reject "bare domain" '"Adds a contact page, see example.com now"' "URL"
+rd accept "Latin word, 。, Japanese" "\"iPhone$(printf '\u3002\u7c21\u5358\u306b\u4f7f\u3048\u308b\u30d7\u30e9\u30b0\u30a4\u30f3\u3067\u3059')\""
+rd accept "Latin word, 。, Kana" "\"Version 2$(printf '\u3002\u65b0\u3057\u3044\u6a5f\u80fd\u3092\u8ffd\u52a0\u3057\u307e\u3057\u305f')\""
 rd reject "ideographic full stop domain" "\"Get the full version at spamsite$(printf '\u3002')com today\"" "URL"
+rd reject "ideographic full stop, accented label" "\"Docs at exampl$(printf '\u00e9\u3002')com for you now\"" "URL"
+rd reject "ideographic full stop, Cyrillic TLD" "\"Docs at example$(printf '\u3002\u0440\u0444') for you now\"" "URL"
 rd reject "emoji" "\"Adds a contact page $(printf '\U0001F600') to a site\"" "emoji"
 rd reject "zero width" "\"Adds a contact$(printf '\u200b') page to a site\"" "emoji, symbols or invisible"
 rd reject "control character" '"Adds a contact page\nto a site today"' "control characters"
@@ -364,6 +469,15 @@ judge=$(awk '/^  judge:/{on=1;print;next} on && /^  [a-z]+:/{exit} on{print}' "$
 if [ -n "$judge" ] && ! grep -Eq 'tests/|scripts/validate-(theme-)?manifest\.sh "\$f"|scripts/check' <<<"$judge"; then ok "judge job runs no pull request code"; else no "judge job runs no pull request code"; fi
 if grep -q 'diff-filter=AMRT' <<<"$judge" && grep -q '100644' <<<"$judge"; then ok "judge job lists type changes and requires regular files"; else no "judge job lists type changes and requires regular files"; fi
 if grep -q 'exit 1' <<<"$judge" && ! grep -q 'fetch_trusted\|return 1\|return 0' <<<"$judge"; then ok "judge job stops when a base file is missing"; else no "judge job stops when a base file is missing"; fi
+# The workflow runs on every pull request, so the required judge check always reports.
+if ! awk '/^on:/{on=1;next} on && /^[a-z]/{exit} on{print}' "$wf" | grep -q 'paths:'; then ok "validate.yml has no pull_request path filter"; else no "validate.yml has no pull_request path filter"; fi
+if grep -q 'nothing to judge' <<<"$judge" && grep -q 'exit "\$status"' <<<"$judge"; then ok "judge prints a note and exits when nothing is relevant"; else no "judge prints a note and exits when nothing is relevant"; fi
+if grep -q 'sweep' <<<"$judge" && grep -q "ls-files -z -- 'manifests/\*.json'" <<<"$judge" && grep -q 'policy manifests/themes' <<<"$judge"; then ok "judge sweeps every plugin manifest on policy or theme changes"; else no "judge sweeps every plugin manifest on policy or theme changes"; fi
+# A type change of the path manifests itself (a symlink) lists as the bare entry "manifests".
+if grep -q '^ *manifests) echo "manifests must be a directory' <<<"$judge" && [ "$(grep -c '^ *manifests) echo "manifests must be a directory' "$wf")" -eq 2 ]; then ok "judge and build reject a bare manifests path"; else no "judge and build reject a bare manifests path"; fi
+# Only the plugin build reads policy/ today; the docs must not say the theme build does.
+if ! grep -q 'build-community-themes' README.md "$wf"; then ok "README and validate.yml do not claim the theme build reads policy/"; else no "README and validate.yml do not claim the theme build reads policy/"; fi
+if ! grep -q 'changed-manifests' <<<"$judge"; then ok "judge sweep uses an inline filter, not a pull request script"; else no "judge sweep uses an inline filter, not a pull request script"; fi
 
 # Description look-alikes: combining marks, fullwidth forms and other symbols are refused.
 rd reject "combining marks" "\"Fr$(printf '\u0301')ee and pr$(printf '\u0301')emium tooling for your team\"" "may contain only"
