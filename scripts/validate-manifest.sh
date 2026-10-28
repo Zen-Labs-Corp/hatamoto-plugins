@@ -386,7 +386,9 @@ if [ "$remote" -eq 1 ]; then
   else
     pdesc=$(printf '%s' "$pj" | jq -r '.description')
     jd() { jv "$pdesc" "$1" description "${@:2}"; }
-    if [ "${#pdesc}" -lt 20 ] || [ "${#pdesc}" -gt 160 ] || [[ $pdesc =~ [[:cntrl:]] ]]; then
+    # Length and control characters are judged on the raw value: command substitution
+    # drops NULs and trailing newlines.
+    if ! printf '%s' "$pj" | jq -e '.description | (length >= 20 and length <= 160 and (test("\\p{Cc}") | not))' >/dev/null 2>&1; then
       bad "plugin.json description must be 20 to 160 characters without control characters"
     fi
     if jd '[$t | scan("[.!?。！？]")] | length > 2'; then
