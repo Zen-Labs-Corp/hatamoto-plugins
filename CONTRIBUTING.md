@@ -108,6 +108,11 @@ and `policy/` of `main`, not the copies in your pull request. Edits to the
 workflow or scripts are covered by maintainer review. Change the policy in its
 own pull request.
 
+The check reports on every pull request. A pull request that changes `policy/` or
+`manifests/themes/` makes it re-judge every plugin manifest in the repository with
+the rules of `main`. The Hatamoto registry build reads the same `policy/` lists from a
+checkout of this repository, and a missing, unreadable or empty list stops the build.
+
 ## The pull request
 
 Fork this repo, add your manifest, and open a PR. Fill in the template: it asks

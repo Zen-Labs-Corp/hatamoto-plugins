@@ -4,8 +4,8 @@
 # The rules mirror manifests/schema.json and the registry build script
 # (registry/build-community.sh in the Hatamoto core repo); keep the three in sync.
 # The listing rules (author, name, title, description) read their word lists from
-# ../policy next to this script. The registry build is to read the same files; it
-# is changed separately, so until then the listing rules are enforced here only.
+# ../policy next to this script. The registry build reads the same files from a
+# checkout of this repository, and a missing, unreadable or empty list stops it.
 # --remote (CI) also checks the repo is reachable, the commit exists, and the
 # plugin.json at that commit carries the manifest name. Manifest values are only
 # ever passed as quoted arguments, never evaluated.

@@ -2,9 +2,10 @@
 # Validate one theme manifest. Usage: validate-theme-manifest.sh <manifests/themes/name.json> [--remote]
 #
 # The rules mirror schemas/theme-manifest.schema.json and the registry build
-# (keep them in sync). Reserved names come from ../policy/reserved-names.txt (the
-# registry build reads the same file from a checkout of this repository; a missing or
-# empty list rejects). --remote (CI) also fetches the source and checks that
+# (registry/build-community-themes.sh in the Hatamoto core repo); keep them in sync.
+# Reserved names come from ../policy/reserved-names.txt next to this script. The registry
+# build reads the same file from a checkout of this repository, and a missing,
+# unreadable or empty list stops it (here it rejects). --remote (CI) also fetches the source and checks that
 # theme.json carries the manifest name and a screenshot under assets/ of <= 2 MiB.
 # If HATAMOTO_BIN is set, the Go validator (`theme check ... --registry`) also runs.
 # Manifest values are only ever passed as quoted arguments, never evaluated.
