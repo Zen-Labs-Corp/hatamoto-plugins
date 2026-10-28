@@ -76,18 +76,25 @@ brand_owned() {
   done <<<"$brands"
   return 1
 }
-# brand_match <word>: print the brand in brands.txt that the word starts with, if any.
-brand_match() {
-  local b rest
+# has_letter <word>: the word holds something other than digits, punctuation and spaces.
+# keep in sync with Hatamoto core registry/build-community.sh
+has_letter() { [[ $1 =~ [^0-9[:punct:][:space:]] ]]; }
+# bkey <word>: lkey with l folded to i too (lkey turns 1 into l, so str1pe needs this to meet stripe).
+# keep in sync with Hatamoto core registry/build-community.sh
+bkey() { lkey "$1" | tr l i; }
+# brand_match_lk <word> [exact]: print the brand whose bkey the bkey of the word starts with
+# (or equals, with "exact"). Catches digit swaps and hyphens (str1pe, str-ipe); skips words
+# with no letter. keep in sync with Hatamoto core registry/build-community.sh
+brand_match_lk() {
+  local w b rest bk
+  has_letter "$1" || return 1
+  w=$(bkey "$1")
   while read -r b rest; do
-    if [ -n "$b" ] && [[ $1 == "$b"* ]]; then printf '%s' "$b"; return 0; fi
+    [ -n "$b" ] || continue
+    bk=$(bkey "$b")
+    if [ "${2:-}" = exact ]; then [ "$w" = "$bk" ] || continue; else [[ $w == "$bk"* ]] || continue; fi
+    printf '%s' "$b"; return 0
   done <<<"$brands"
-  return 1
-}
-# brand_listed <word>: the word is exactly a brand in brands.txt.
-brand_listed() {
-  local b rest
-  while read -r b rest; do [ "$b" = "$1" ] && return 0; done <<<"$brands"
   return 1
 }
 # lev1 <a> <b>: edit distance of at most 1.
@@ -243,7 +250,7 @@ if has name && [[ $name =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
     if [ "$reserved_flagged" -eq 0 ] && inlist "$reserved_names" "$name"; then
       bad "name \"$name\" is reserved"
     fi
-    if b=$(brand_match "${ntoks[0]}") && ! brand_owned "$b" "$owner"; then
+    if b=$(brand_match_lk "$name") && ! brand_owned "$b" "$owner"; then
       bad "name must not start with the brand \"$b\""
     fi
   fi
@@ -327,7 +334,7 @@ if has title; then
       if inlist "$banned_words" "$w"; then bad "title contains the banned word \"$w\""; fi
     done <<<"$title_words"
     if [ "$fpx" -eq 0 ]; then
-      if [ -n "$first_word" ] && b=$(brand_match "$first_word") && ! brand_owned "$b" "$owner"; then
+      if [ -n "$first_word" ] && b=$(brand_match_lk "$first_word") && ! brand_owned "$b" "$owner"; then
         bad "title must not start with the brand \"$b\""
       fi
       # The title must share an alphanumeric word with the name.
@@ -439,8 +446,8 @@ if [ "$remote" -eq 1 ]; then
       if [ "$w" != free ] && [ "$w" != plugin ] && inlist "$banned_words" "$w"; then
         bad "plugin.json description contains the banned word \"$w\""
       fi
-      if brand_listed "$w" && [[ $seen_brands != *" $w "* ]]; then
-        seen_brands="$seen_brands$w "
+      if b=$(brand_match_lk "$w" exact) && [[ $seen_brands != *" $b "* ]]; then
+        seen_brands="$seen_brands$b "
         nbrands=$((nbrands + 1))
       fi
     done <<<"$desc_words"

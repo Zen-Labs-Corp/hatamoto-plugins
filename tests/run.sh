@@ -285,6 +285,13 @@ nm accept name-1 "Name 1" ""
 # A brand is refused as a prefix of the first name token and of the first title word.
 nm reject stripecheckout "Stripecheckout" 'title must not start with the brand "stripe"'
 nm reject stripecheckout "Stripecheckout" 'name must not start with the brand "stripe"'
+# Brand variants (digit swaps, hyphens) in names, titles and description words.
+nm reject str1pe-sync "Str1pe Sync" 'name must not start with the brand "stripe"'
+nm reject str-ipe "Str Ipe" 'name must not start with the brand "stripe"'
+nm reject g00gle-sync "Sync G00gle" 'name must not start with the brand "google"'
+nm reject checkout "Str1pe checkout" 'title must not start with the brand "stripe"'
+nm accept viewer-3d "Viewer 3D" ""
+nm accept five-sync "Five Sync 5g" ""
 # A spaced hyphen is a separator too.
 nm reject leads "Leads - HubSpot - Zapier - Mailchimp" "more than one separator"
 nm accept acme-sync "Acme - Sync" ""
@@ -374,6 +381,10 @@ rd reject "maths-bold brand is the 4th" "\"Works with $M, google, hubspot and za
 rd reject "ligature brand" '"Works with cloud\ufb02are, stripe, google and hubspot."' "names more than 3 brands"
 rd reject "Kelvin and small-capital brand" "\"Works with $(printf 's\u1d1b\u0280ipe'), google, hubspot and zap\u0069er.\"" "names more than 3 brands"
 rd reject "Kelvin brand" "\"Works with stripe, google, hubspot and tikto$(printf '\u212a').\"" "names more than 3 brands"
+rd reject "variant brands counted" '"Works with str1pe, g00gle, hubspot and zapier."' "names more than 3 brands"
+rd reject "variant brands count once per brand" '"Works with str1pe, stripe, g00gle, hubspot, zapier."' "names more than 3 brands"
+rd accept "digit tokens are not brands" '"Rated 5g 2024 3d 10 135 s3 a1 for sites."'
+rd accept "variant of one brand twice" '"Works with str1pe and stripe and g00gle and hubspot."'
 rd accept "plain sentence" '"Adds a contact page to a site."'
 rd accept "two sentences" '"Adds a contact page. Works with any theme."'
 rd accept "free and plugin allowed" '"A free plugin that adds a contact page."'
