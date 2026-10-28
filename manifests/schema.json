@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Hatamoto community plugin manifest",
+  "$comment": "Shape rules only. The listing rules (author equals the repo owner, brand and reserved names, look-alike names, title words and scripts, plugin.json description) are enforced by scripts/validate-manifest.sh.",
   "type": "object",
   "additionalProperties": false,
   "required": ["name", "repo", "commit", "license", "sdk", "archive_grant"],
@@ -9,7 +10,7 @@
     "repo": { "type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$" },
     "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "subdir": { "type": "string" },
-    "title": { "type": "string", "minLength": 1, "maxLength": 60, "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f ]([^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u001f\\u007f-\\u009f ])?$" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 40, "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f ]([^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u001f\\u007f-\\u009f ])?$" },
     "author": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}$" },
     "license": { "enum": ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MPL-2.0", "GPL-2.0", "GPL-2.0-only", "GPL-2.0-or-later", "GPL-3.0", "GPL-3.0-only", "GPL-3.0-or-later", "LGPL-2.1", "LGPL-2.1-only", "LGPL-2.1-or-later", "LGPL-3.0", "LGPL-3.0-only", "LGPL-3.0-or-later", "AGPL-3.0", "AGPL-3.0-only", "AGPL-3.0-or-later"] },
     "sdk": { "type": "string" },
@@ -21,7 +22,7 @@
   "if": { "required": ["tier"] },
   "then": {
     "not": { "required": ["author"] },
-    "properties": { "repo": { "pattern": "^https://github\\.com/[Zz][Ee][Nn][Ll][Aa][Bb][Ss][Cc][Oo][Rr][Pp]/[A-Za-z0-9._-]+$" } }
+    "properties": { "repo": { "pattern": "^https://github\\.com/([Zz][Ee][Nn][Ll][Aa][Bb][Ss][Cc][Oo][Rr][Pp]|[Zz][Ee][Nn]-[Ll][Aa][Bb][Ss]-[Cc][Oo][Rr][Pp])/[A-Za-z0-9._-]+$" } }
   },
   "else": {
     "required": ["author"],

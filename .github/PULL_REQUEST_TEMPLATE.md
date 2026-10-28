@@ -10,6 +10,7 @@ Pinned commit:
 
 - [ ] The manifest is `manifests/<name>.json` and `<name>` matches `plugin.json`.
 - [ ] `commit` is the full 40 character commit id I want reviewed and built.
+- [ ] My manifest follows the listing rules in CONTRIBUTING.md (Listing rules): the author is the repo owner.
 - [ ] The plugin builds locally with `GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o build/plugin.wasm .`
 - [ ] Every permission in `plugin.json` is needed; I explain each one below.
 - [ ] `allowed_hosts` lists only the hosts the plugin calls (no `*` unless essential).

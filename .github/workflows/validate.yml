@@ -3,6 +3,12 @@
 # theme tests. No secrets, no signing: publishing is done by the Hatamoto release
 # manager, never by CI.
 #
+# The `judge` job validates plugin manifests and runs only base-branch code: the
+# validator script and the policy/ word lists come from the base branch, and no pull
+# request code runs in that job. The base branch must already carry policy/; until it
+# does the job fails closed when plugin manifests change. A pull request that edits
+# the workflow or scripts is covered by maintainer review, not by this job.
+#
 # The `build` job compiles each changed plugin (themes have no build and no SDK) at its pinned commit. It needs the
 # public Hatamoto SDK (hatamoto.dev/sdk); it runs only when the repository variable
 # SDK_PUBLIC is 'true', which is set once the SDK repository is published.
@@ -12,6 +18,7 @@ on:
   pull_request:
     paths:
       - 'manifests/**'
+      - 'policy/**'
       - 'scripts/**'
       - 'schemas/**'
       - 'tests/**'
@@ -33,7 +40,7 @@ jobs:
         run: bash tests/run.sh
       - name: Self-test the theme validator
         run: bash tests/run-themes.sh
-      - name: Validate changed manifests
+      - name: Validate changed theme manifests
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
@@ -41,8 +48,32 @@ jobs:
           status=0
           while IFS= read -r -d '' f; do
             case "$f" in
-              manifests/README.md | manifests/schema.json | manifests/themes/README.md) continue ;;
-              manifests/themes/*.json) scripts/validate-theme-manifest.sh "$f" --remote || status=1; continue ;;
+              manifests/themes/README.md) continue ;;
+              manifests/themes/*.json) scripts/validate-theme-manifest.sh "$f" --remote || status=1 ;;
+            esac
+          done < <(git diff -z --name-only --diff-filter=AMR "origin/$BASE_REF...HEAD" -- manifests)
+          exit "$status"
+
+  # Judges plugin manifests. This job runs no code from the pull request: no tests, no
+  # PR-head scripts. The validator and policy/ come from the base branch.
+  judge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Judge changed plugin manifests with the base branch validator and policy
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          status=0
+          # 1. The changed plugin manifests. Type changes are listed; only regular files pass.
+          files=()
+          while IFS= read -r -d '' f; do
+            case "$f" in
+              manifests/README.md | manifests/schema.json | manifests/themes/README.md | manifests/themes/*.json) continue ;;
               manifests/*.json) ;;
               manifests/*) echo "$f: only manifests/<name>.json files are allowed here" >&2; status=1; continue ;;
               *) continue ;;
@@ -52,8 +83,32 @@ jobs:
               echo "$f: file name must be <name>.json with a valid plugin name" >&2
               status=1; continue
             fi
-            scripts/validate-manifest.sh "$f" --remote || status=1
-          done < <(git diff -z --name-only --diff-filter=AMR "origin/$BASE_REF...HEAD" -- manifests)
+            mode=$(git ls-files -s -- "$f" | cut -d' ' -f1)
+            if [ -L "$f" ] || [ "$mode" != 100644 ]; then
+              echo "$f: a manifest must be a regular file, not a symlink or other type" >&2
+              status=1; continue
+            fi
+            files+=("$f")
+          done < <(git diff -z --name-only --diff-filter=AMRT "origin/$BASE_REF...HEAD" -- manifests)
+          if [ "${#files[@]}" -eq 0 ]; then exit "$status"; fi
+          # 2. Copy the validator and policy from the base branch, once. Any failure stops the job.
+          trusted=$(mktemp -d)
+          trap 'rm -rf "$trusted"' EXIT
+          mkdir -p "$trusted/scripts" "$trusted/policy"
+          if ! git show "origin/$BASE_REF:scripts/validate-manifest.sh" > "$trusted/scripts/validate-manifest.sh"; then
+            echo "the base branch has no validator to judge plugin manifests" >&2
+            exit 1
+          fi
+          for p in reserved-names banned-tokens banned-words brands placeholders; do
+            if ! git show "origin/$BASE_REF:policy/$p.txt" > "$trusted/policy/$p.txt"; then
+              echo "the base branch has no policy/$p.txt to judge plugin manifests" >&2
+              exit 1
+            fi
+          done
+          # 3. Judge.
+          for f in "${files[@]}"; do
+            bash "$trusted/scripts/validate-manifest.sh" "$f" --remote || status=1
+          done
           exit "$status"
 
   build:
