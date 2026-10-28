@@ -317,6 +317,8 @@ nm accept acme-sync "Acme - Sync" ""
 nm reject sync-tool "$(printf '\ua731\u1d1b\u0280\u026a\u1d18\u1d07') Sync Tool" 'title must not start with the brand "stripe"'
 nm reject sync-tool "$(printf '\u02e2\u1d57\u02b3\u2071\u1d56\u1d49') Sync Tool" "invisible characters"
 tt accept "$(printf '\u65e5\u3005\u30e1\u30e2\u309d\u30fc')" fp
+# A Hangul-only title with a Hangul filler passes the script rules, so only the filler rule refuses it.
+tt reject "$(printf '\ube14\ub85c\uadf8\u3164\ub3c4\uad6c')" fp "invisible characters"
 # First-party titles still get the character, script and word rules, but need not share a word.
 tt accept "Google Tag Manager" fp
 tt accept "$(printf '\u65e5\u672c\u8a9e\u306e\u30bf\u30a4\u30c8\u30eb\u30fc')" fp
@@ -404,7 +406,7 @@ fold_t "Plain Text" "plain text"
 M=$(printf '\U1D42C\U1D42D\U1D42B\U1D422\U1D429\U1D41E')
 rd reject "maths-bold brand is the 4th" "\"Works with $M, google, hubspot and zapier.\"" "names more than 3 brands"
 rd reject "ligature brand" '"Works with cloud\ufb02are, stripe, google and hubspot."' "names more than 3 brands"
-rd reject "Kelvin and small-capital brand" "\"Works with $(printf 's\u1d1b\u0280ipe'), google, hubspot and zap\u0069er.\"" "names more than 3 brands"
+rd reject "Kelvin and small-capital brand" "\"Works with $(printf 's\u1d1b\u0280ipe'), google, hubspot and tikto$(printf '\u212a').\"" "names more than 3 brands"
 rd reject "letterlike script banned word" "\"The $(printf '\U0001D4B7\u212f\U0001D4C8\U0001D4C9') calendar sync for sites.\"" 'banned word "best"'
 rd reject "letterlike brand" "\"Works with stripe, $(printf '\U0001D4F0\U0001D4F8\U0001D4F8\U0001D4F0\U0001D4F5\u212f'), hubspot and zapier.\"" "names more than 3 brands"
 rd reject "modifier letters in description" "\"Works with $(printf '\u02e2\u1d57\u02b3\u2071\u1d56\u1d49') for your site today.\"" "invisible characters"
