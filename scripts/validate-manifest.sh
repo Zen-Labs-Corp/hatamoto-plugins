@@ -330,6 +330,9 @@ if has title; then
     # Words: lowercase alphanumeric tokens ('#' kept so "#1" is a word).
     title_words=$(jq -nr --arg t "$title" "$fold_def"'$t | fold | scan("[\\p{L}\\p{N}#]+")') \
       || { bad "title could not be checked"; title_words=""; }
+    # The first token as written, with - . ' removed, so "Str-ipe" is not split into two words.
+    title_token=$(jq -nr --arg t "$title" "$fold_def"'$t | fold | split(" ")[0] | gsub("[-.\u0027\u2019]"; "")') \
+      || { bad "title could not be checked"; title_token=""; }
     first_word=""
     while read -r w; do
       [ -n "$w" ] || continue
@@ -337,9 +340,12 @@ if has title; then
       if inlist "$banned_words" "$w"; then bad "title contains the banned word \"$w\""; fi
     done <<<"$title_words"
     if [ "$fpx" -eq 0 ]; then
-      if [ -n "$first_word" ] && b=$(brand_match_lk "$first_word") && ! brand_owned "$b" "$owner"; then
-        bad "title must not start with the brand \"$b\""
-      fi
+      for w in "$first_word" "$title_token"; do
+        if [ -n "$w" ] && b=$(brand_match_lk "$w") && ! brand_owned "$b" "$owner"; then
+          bad "title must not start with the brand \"$b\""
+          break
+        fi
+      done
       # The title must share an alphanumeric word with the name.
       shared=0
       if [[ $name =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
@@ -444,18 +450,28 @@ if [ "$remote" -eq 1 ]; then
     if inlist "$placeholders" "$dnorm"; then bad "plugin.json description is a placeholder"; fi
     desc_words=$(jq -nr --arg t "$pdesc" "$fold_def"'$t | fold | scan("[\\p{L}\\p{N}#]+")') \
       || { bad "description could not be checked"; desc_words=""; }
+    # Whitespace tokens with - . ' removed, so "str-ipe" is one word again (brands only).
+    desc_joined=$(jq -nr --arg t "$pdesc" "$fold_def"'$t | fold | gsub("[-.\u0027\u2019]"; "") | scan("[\\p{L}\\p{N}#]+")') \
+      || { bad "description could not be checked"; desc_joined=""; }
     seen_brands=" "
     nbrands=0
+    count_brand() { # count_brand <word>: count each listed brand once
+      local b
+      if b=$(brand_match_lk "$1" exact) && [[ $seen_brands != *" $b "* ]]; then
+        seen_brands="$seen_brands$b "
+        nbrands=$((nbrands + 1))
+      fi
+    }
     while read -r w; do
       [ -n "$w" ] || continue
       if [ "$w" != free ] && [ "$w" != plugin ] && inlist "$banned_words" "$w"; then
         bad "plugin.json description contains the banned word \"$w\""
       fi
-      if b=$(brand_match_lk "$w" exact) && [[ $seen_brands != *" $b "* ]]; then
-        seen_brands="$seen_brands$b "
-        nbrands=$((nbrands + 1))
-      fi
+      count_brand "$w"
     done <<<"$desc_words"
+    while read -r w; do
+      [ -n "$w" ] && count_brand "$w"
+    done <<<"$desc_joined"
     if [ "$nbrands" -gt 3 ]; then bad "plugin.json description names more than 3 brands"; fi
   fi
   [ "$fail" -eq 0 ] || exit 1
