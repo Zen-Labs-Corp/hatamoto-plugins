@@ -80,19 +80,32 @@ CI rejects a manifest that breaks these rules. The word lists are plain text in
   fine, `stripe-checkout` is not), and it may not look like another listing or a
   reserved name (one character apart, or equal once `-` is removed and `0 1 3 5`
   are read as `o l e s`). This can reject ordinary words: `auto` looks like
-  `auth` and `logic` like `login`.
+  `auth` and `logic` like `login`. A brand written with digits or hyphens
+  (`str1pe-sync`, `str-ipe`) counts as the brand, and so does one split across
+  hyphens at a word boundary.
 - **Title.** At most 40 characters, only letters, digits, spaces and
   `. , : & / | + ' ! ? -`, at most one of `: , & / | +` or a spaced hyphen
-  (` - `), one script only (Han with Kana or Hangul counts as one), no word from
+  (` - `, and `--` counts as one too), one script only (Han with Kana or Hangul counts as one), no word from
   [policy/banned-words.txt](policy/banned-words.txt), no brand as the start of
   the first word, and it shares a word with the name (digits alone do not count).
   Look-alike letters (for example Cyrillic `а`) are read as the Latin letter
-  when the words are checked.
+  when the words are checked. The brand rule also reads the first word with `-`,
+  `.` and `'` removed (`Str-ipe` is `Stripe`). Invisible filler characters
+  (such as the Hangul filler) and modifier letters (such as `ˢ`) are refused;
+  `々` and `ー` stay.
 - **Description** (in `plugin.json`). 20 to 160 characters, at most two
   sentence endings, no URL or domain, only letters, digits, spaces and ASCII
   punctuation (no combining marks, fullwidth forms, emoji or symbols), not the title or the name, not a
   placeholder from [policy/placeholders.txt](policy/placeholders.txt), at most
-  three brands, and no banned word except `free` and `plugin`.
+  three brands, and no banned word except `free` and `plugin`. Brands written
+  as `str-ipe` or `g00gle` count, and so do look-alike letters. A domain written
+  with non-ASCII letters, or with `。` after a Latin letter, counts as a domain.
+  The `plugin.json` must be one JSON object whose keys are lowercase
+  identifiers (`description`, not `Description`).
+
+Themes follow the same name rule: a theme name may not look like a plugin, another
+theme or a reserved name (one character apart, or equal after folding hyphens and
+digit swaps), and a plugin and a theme cannot share a name.
 
 Reviewers also check what a script cannot:
 
@@ -110,8 +123,9 @@ own pull request.
 
 The check reports on every pull request. A pull request that changes `policy/` or
 `manifests/themes/` makes it re-judge every plugin manifest in the repository with
-the rules of `main`. The Hatamoto registry build reads the same `policy/` lists from a
-checkout of this repository, and a missing, unreadable or empty list stops the build.
+the rules of `main`. The Hatamoto registry build for plugins reads the same `policy/` lists
+from a checkout of this repository, and a missing, unreadable or empty list stops the build.
+The theme build does not read `policy/` yet; it will read `reserved-names.txt` in a follow-up.
 
 ## The pull request
 

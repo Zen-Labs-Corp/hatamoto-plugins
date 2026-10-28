@@ -10,10 +10,10 @@
 # plugin manifest in the repository with the base rules, not only the changed ones.
 # The base branch must already carry policy/; until it does the job fails closed when
 # plugin manifests are judged. A pull request that edits the workflow or scripts is
-# covered by maintainer review, not by this job. The Hatamoto registry build
-# (registry/build-community.sh and build-community-themes.sh in the Hatamoto core
-# repository) reads the same policy/ from a checkout of this repository, and a missing,
-# unreadable or empty list stops that build.
+# covered by maintainer review, not by this job. The Hatamoto registry build for plugins
+# (registry/build-community.sh in the Hatamoto core repository) reads the same policy/
+# from a checkout of this repository, and a missing, unreadable or empty list stops that
+# build. The theme build keeps its own reserved list until a follow-up reads policy/.
 #
 # The `build` job compiles each changed plugin (themes have no build and no SDK) at its pinned commit. It needs the
 # public Hatamoto SDK (hatamoto.dev/sdk); it runs only when the repository variable

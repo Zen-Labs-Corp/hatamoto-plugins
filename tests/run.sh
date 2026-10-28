@@ -468,6 +468,8 @@ if grep -q 'nothing to judge' <<<"$judge" && grep -q 'exit "\$status"' <<<"$judg
 if grep -q 'sweep' <<<"$judge" && grep -q "ls-files -z -- 'manifests/\*.json'" <<<"$judge" && grep -q 'policy manifests/themes' <<<"$judge"; then ok "judge sweeps every plugin manifest on policy or theme changes"; else no "judge sweeps every plugin manifest on policy or theme changes"; fi
 # A type change of the path manifests itself (a symlink) lists as the bare entry "manifests".
 if grep -q '^ *manifests) echo "manifests must be a directory' <<<"$judge" && [ "$(grep -c '^ *manifests) echo "manifests must be a directory' "$wf")" -eq 2 ]; then ok "judge and build reject a bare manifests path"; else no "judge and build reject a bare manifests path"; fi
+# Only the plugin build reads policy/ today; the docs must not say the theme build does.
+if ! grep -q 'build-community-themes' README.md "$wf"; then ok "README and validate.yml do not claim the theme build reads policy/"; else no "README and validate.yml do not claim the theme build reads policy/"; fi
 if ! grep -q 'changed-manifests' <<<"$judge"; then ok "judge sweep uses an inline filter, not a pull request script"; else no "judge sweep uses an inline filter, not a pull request script"; fi
 
 # Description look-alikes: combining marks, fullwidth forms and other symbols are refused.

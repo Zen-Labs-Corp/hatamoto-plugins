@@ -16,10 +16,12 @@ both `#` and `payments` would be read as brand owners. Every list except
 | `placeholders.txt` | descriptions that are unfilled templates (whole line) |
 
 The validator reads these files from the base branch in CI. The Hatamoto registry
-build (`registry/build-community.sh` and `build-community-themes.sh` in the Hatamoto
-core repository) reads the same files from a checkout of this repository. A missing,
-unreadable or empty list makes validation fail and stops that build, so a bad policy
-change breaks publishing, not just PR checks. The theme validator reads
+build for plugins (`registry/build-community.sh` in the Hatamoto core repository)
+reads the same files from a checkout of this repository. A missing, unreadable or
+empty list makes validation fail and stops that build, so a bad policy change
+breaks publishing, not just PR checks. The theme build (`build-community-themes.sh`)
+does not read `policy/` yet: it keeps a hardcoded reserved list and will read
+`reserved-names.txt` in a follow-up. The theme validator here reads
 `reserved-names.txt` too, and its look-alike check (one character apart, or the same
 after folding hyphens and digit swaps) applies to theme names against plugin names,
 other themes and reserved names. The matching rules in the core build land in the
