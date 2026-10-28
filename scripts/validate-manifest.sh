@@ -270,8 +270,8 @@ if has title; then
     if jt "$unsafe_chars_filter"; then
       bad "title must not contain emoji, symbols or invisible characters"
     fi
-    if jt '[$t | scan("[:,&/|+]")] | length > 1'; then
-      bad "title \"$title\" has more than one separator (: , & / | +)"
+    if jt '[$t | scan("[:,&/|+]| - ")] | length > 1'; then
+      bad "title \"$title\" has more than one separator (: , & / | + and a spaced hyphen)"
     fi
     if jt '$t | test("[\\[\\](){}<>]|\\p{Ps}|\\p{Pe}")'; then
       bad "title must not contain brackets"

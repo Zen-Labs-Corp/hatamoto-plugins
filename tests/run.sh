@@ -255,6 +255,9 @@ nm accept name-1 "Name 1" ""
 # A brand is refused as a prefix of the first name token and of the first title word.
 nm reject stripecheckout "Stripecheckout" 'title must not start with the brand "stripe"'
 nm reject stripecheckout "Stripecheckout" 'name must not start with the brand "stripe"'
+# A spaced hyphen is a separator too.
+nm reject leads "Leads - HubSpot - Zapier - Mailchimp" "more than one separator"
+nm accept acme-sync "Acme - Sync" ""
 # First-party titles still get the character, script and word rules, but need not share a word.
 tt accept "Google Tag Manager" fp
 tt accept "$(printf '\u65e5\u672c\u8a9e\u306e\u30bf\u30a4\u30c8\u30eb\u30fc')" fp
