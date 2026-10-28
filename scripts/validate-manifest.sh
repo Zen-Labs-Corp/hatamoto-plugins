@@ -61,6 +61,10 @@ banned_tokens=$(plist banned-tokens)
 banned_words=$(plist banned-words)
 brands=$(plist brands)
 placeholders=$(plist placeholders)
+# An empty list would switch its rule off; only the placeholders may be empty.
+for p in reserved_names banned_tokens banned_words brands; do
+  [ -n "${!p}" ] || { bad "empty policy: ${p//_/-}.txt"; exit 1; }
+done
 # inlist <newline separated list> <word>: exact whole-line membership.
 inlist() { [[ $'\n'$1$'\n' == *$'\n'"$2"$'\n'* ]]; }
 # brand_owned <brand> <owner>: the brand is listed with that owner.

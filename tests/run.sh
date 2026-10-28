@@ -148,6 +148,19 @@ for r in root root2; do
   else no "$r: missing policy: $err"; fi
 done
 
+# Fail closed on an empty list (comments and blank lines only); placeholders may be empty.
+for l in reserved-names banned-tokens banned-words brands placeholders; do
+  mkdir -p "$tmp/root3/scripts" "$tmp/root3/policy"
+  cp scripts/validate-manifest.sh "$tmp/root3/scripts/"
+  cp policy/*.txt "$tmp/root3/policy/"
+  printf '# nothing here\n\n' > "$tmp/root3/policy/$l.txt"
+  err=$("$tmp/root3/scripts/validate-manifest.sh" "$f/good.json" 2>&1 >/dev/null); rc=$?
+  if [ "$l" = placeholders ]; then
+    [ "$rc" -eq 0 ] && ok "empty $l list accepted" || no "empty $l list accepted: $err"
+  elif [ "$rc" -ne 0 ] && [[ $err == *"empty policy: $l.txt"* ]]; then ok "empty $l list rejected"
+  else no "empty $l list rejected: $err"; fi
+done
+
 # Every manifest of the registry keeps passing (schema.json is not a manifest).
 for m in manifests/*.json; do
   [ "$m" = manifests/schema.json ] && continue
