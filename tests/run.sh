@@ -66,6 +66,8 @@ for n in gtm searchconsole; do
 done
 fp gtm ZenLabsCorp
 if "$v" "$tmp/gtm.json" >/dev/null 2>&1; then ok "first-party owner ZenLabsCorp accepted"; else no "first-party owner ZenLabsCorp accepted"; fi
+fp gtm Zen-Labs-Corp
+if "$v" "$tmp/gtm.json" >/dev/null 2>&1; then ok "first-party owner Zen-Labs-Corp accepted"; else no "first-party owner Zen-Labs-Corp accepted"; fi
 fp acme-seo zenlabscorp
 if "$v" "$tmp/acme-seo.json" >/dev/null 2>&1; then ok "first-party non-reserved name accepted"; else no "first-party non-reserved name accepted"; fi
 # reject_fp <label> <want> <name> <jq filter over the first-party manifest> [owner]
@@ -88,7 +90,7 @@ reject_fp "tier junk" "tier must be" acme-seo '.tier = "x"'
 reject_fp "tier non-string" "tier must be a string" acme-seo '.tier = true'
 reject_fp "webhooks first-party from zenlabscorp" "reserved for a first-party plugin" webhooks .
 reject_fp "hello first-party from zenlabscorp" "reserved for a first-party plugin" hello .
-for o in zenlabscorp-evil zenlabscorpx zenlabscorp.evil xzenlabscorp; do
+for o in zenlabscorp-evil zenlabscorpx zenlabscorp.evil xzenlabscorp zen-labs-corp-evil zen-labs-corpx xzen-labs-corp; do
   reject_fp "look-alike owner $o" "tier first-party requires" gtm . "$o"
 done
 # tier on a community-owned good.json (author present, acme owner) is refused too.
@@ -158,6 +160,11 @@ PY
   sc accept "good.json" "$f/good.json"
   fp gtm zenlabscorp; sc accept "first-party gtm" "$tmp/gtm.json"
   fp gtm ZenLabsCorp; sc accept "first-party ZenLabsCorp" "$tmp/gtm.json"
+  fp gtm Zen-Labs-Corp; sc accept "first-party Zen-Labs-Corp" "$tmp/gtm.json"
+  fp gtm zen-labs-corp; sc accept "first-party zen-labs-corp" "$tmp/gtm.json"
+  for o in zen-labs-corp-evil zen-labs-corpx zen-labs.corp xzen-labs-corp; do fp gtm "$o"; sc reject "look-alike $o" "$tmp/gtm.json"; done
+  jq --arg t "$(printf 'x%.0s' $(seq 40))" '.title = $t' "$f/good.json" > "$tmp/x.json"; sc accept "40-character title" "$tmp/x.json"
+  jq --arg t "$(printf 'x%.0s' $(seq 41))" '.title = $t' "$f/good.json" > "$tmp/x.json"; sc reject "41-character title" "$tmp/x.json"
   fp gtm acme; sc reject "first-party from acme" "$tmp/gtm.json"
   for o in zenlabscorp-evil zenlabscorpx zenlabscorp.evil; do fp gtm "$o"; sc reject "look-alike $o" "$tmp/gtm.json"; done
   fp gtm zenlabscorp; jq '.author = "zenlabscorp"' "$tmp/gtm.json" > "$tmp/x.json"; sc reject "tier with author" "$tmp/x.json"
