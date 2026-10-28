@@ -373,6 +373,11 @@ if [ "$remote" -eq 1 ]; then
     echo "$file: no $path at commit $commit" >&2
     exit 1
   fi
+  # keep in sync with Hatamoto core registry/build-community.sh (check_description)
+  if ! printf '%s' "$pj" | jq -e 'type == "object" and (keys | all(test("^[a-z][a-z0-9_]*$")))' >/dev/null 2>&1; then
+    echo "$file: plugin.json keys must be lowercase identifiers" >&2
+    exit 1
+  fi
   pname=$(printf '%s' "$pj" | jq -r '.name // empty' 2>/dev/null || true)
   if [ "$pname" != "$name" ]; then
     echo "$file: plugin.json name \"$pname\" does not match manifest name \"$name\"" >&2

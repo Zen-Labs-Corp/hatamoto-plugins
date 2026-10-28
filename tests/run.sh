@@ -315,21 +315,35 @@ if "$v" "$tmp/good.json" >/dev/null 2>&1; then ok "accepts nested subdir"; else 
 # Description rules: --remote reads plugin.json at the pinned commit (file:/// repos, offline).
 # rd <accept|reject> <label> <plugin.json description as JSON, or "-" for none> [want]
 rd() {
-  local want=$1 label=$2 desc=$3 msg=${4:-} dir="$tmp/rd/own/descy" err
+  local raw
+  if [ "$3" = "-" ]; then raw=$(jq -nc '{name: "descy", sdk: "^0.10"}')
+  else raw=$(jq -nc --argjson d "$3" '{name: "descy", sdk: "^0.10", description: $d}'); fi
+  rj "$1" "$2" "$raw" "${4:-}" description
+}
+# rj <accept|reject> <label> <raw plugin.json text> [want] [noun]: same fixture, raw plugin.json.
+rj() {
+  local want=$1 label=$2 raw=$3 msg=${4:-} noun=${5:-plugin.json} dir="$tmp/rd/own/descy" err
   rm -rf "$dir" "$tmp/rd/manifests"; mkdir -p "$dir" "$tmp/rd/manifests"
-  if [ "$desc" = "-" ]; then jq -n '{name: "descy", sdk: "^0.10"}' > "$dir/plugin.json"
-  else jq -n --argjson d "$desc" '{name: "descy", sdk: "^0.10", description: $d}' > "$dir/plugin.json"; fi
+  printf '%s' "$raw" > "$dir/plugin.json"
   git -C "$dir" init -q
   git -C "$dir" add -A
   git -C "$dir" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -q -m init
   jq --arg r "file://$dir" --arg c "$(git -C "$dir" rev-parse HEAD)" \
     '.name = "descy" | .repo = $r | .commit = $c | .author = "own" | .title = "Descy Tools"' "$f/good.json" > "$tmp/rd/manifests/descy.json"
   if err=$(HATAMOTO_ALLOW_FILE_REPOS=1 "$v" "$tmp/rd/manifests/descy.json" --remote 2>&1 >/dev/null); then
-    [ "$want" = accept ] && ok "description accepted: $label" || no "description accepted: $label"
-  elif [ "$want" = accept ]; then no "description accepted: $label: $err"
-  elif [[ $err == *"$msg"* ]]; then ok "description rejected: $label"
-  else no "description rejected: $label: $err"; fi
+    [ "$want" = accept ] && ok "$noun accepted: $label" || no "$noun accepted: $label"
+  elif [ "$want" = accept ]; then no "$noun accepted: $label: $err"
+  elif [[ $err == *"$msg"* ]]; then ok "$noun rejected: $label"
+  else no "$noun rejected: $label: $err"; fi
 }
+# plugin.json shape: an array or a non-lowercase top-level key is refused before .name is read.
+k='plugin.json keys must be lowercase identifiers'
+rj reject "array" '[]' "$k"
+rj reject "Description key" '{"name":"descy","sdk":"^0.10","Description":"A calendar sync tool"}' "$k"
+rj reject "Name key" '{"Name":"descy","sdk":"^0.10"}' "$k"
+rj reject "long-s key" '{"name":"descy","sdk":"^0.10","de\u017fcription":"A calendar sync tool"}' "$k"
+rj reject "string" '"deſcription"' "$k"
+rj accept "lowercase object" '{"name":"descy","sdk":"^0.10","description":"Adds a contact page to a site."}'
 rd accept "plain sentence" '"Adds a contact page to a site."'
 rd accept "two sentences" '"Adds a contact page. Works with any theme."'
 rd accept "free and plugin allowed" '"A free plugin that adds a contact page."'
