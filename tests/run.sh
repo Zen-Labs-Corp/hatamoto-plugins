@@ -445,6 +445,8 @@ rd reject "fullwidth terminators" '"サイトに追加します。簡単です�
 rd reject "URL scheme" '"Docs at http://example.com for the page"' "URL"
 rd reject "www" '"Visit www example and www.example for more"' "URL"
 rd reject "bare domain" '"Adds a contact page, see example.com now"' "URL"
+rd accept "Latin word, 。, Japanese" "\"iPhone$(printf '\u3002\u7c21\u5358\u306b\u4f7f\u3048\u308b\u30d7\u30e9\u30b0\u30a4\u30f3\u3067\u3059')\""
+rd accept "Latin word, 。, Kana" "\"Version 2$(printf '\u3002\u65b0\u3057\u3044\u6a5f\u80fd\u3092\u8ffd\u52a0\u3057\u307e\u3057\u305f')\""
 rd reject "ideographic full stop domain" "\"Get the full version at spamsite$(printf '\u3002')com today\"" "URL"
 rd reject "ideographic full stop, accented label" "\"Docs at exampl$(printf '\u00e9\u3002')com for you now\"" "URL"
 rd reject "ideographic full stop, Cyrillic TLD" "\"Docs at example$(printf '\u3002\u0440\u0444') for you now\"" "URL"

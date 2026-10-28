@@ -445,9 +445,9 @@ if [ "$remote" -eq 1 ]; then
     fi
     # keep in sync with Hatamoto core registry/build-community.sh (domain-like tokens: any script around an ASCII dot;
     # the ideographic full stop after a Latin letter or digit and before any letters, since IDNA reads it as a dot; the
-    # other dot-likes after ASCII only. A Kana or Han label before 。 stays allowed, so a Japanese sentence end is not
-    # a domain; known gap: テスト。com is accepted)
-    if jd '$t | test("://|www\\.|[\\p{L}\\p{N}-]+[.]\\p{L}{2,}|[\\p{Latin}\\p{N}-]+\u3002\\p{L}{2,}|[A-Za-z0-9-]+[\uFF0E\uFF61\u2024][A-Za-z]{2,}"; "i")'; then
+    # other dot-likes after ASCII only. A Kana or Han label before 。 stays allowed, and so does Han, Kana or Hangul
+    # right after it, so a Japanese sentence end is not a domain; known gaps: テスト。com and example。中国 are accepted)
+    if jd '$t | test("://|www\\.|[\\p{L}\\p{N}-]+[.]\\p{L}{2,}|[\\p{Latin}\\p{N}-]+\u3002(?:(?![\\p{Han}\\p{Hiragana}\\p{Katakana}\\p{Hangul}])\\p{L}){2,}|[A-Za-z0-9-]+[\uFF0E\uFF61\u2024][A-Za-z]{2,}"; "i")'; then
       bad "plugin.json description must not contain a URL or domain"
     fi
     if jd '$t | test("\\p{M}|[\uFF00-\uFFEF]") or ($t | test("^[\\p{L}\\p{N} \u0021-\u007E\u3001\u3002\u2019]*$") | not)'; then

@@ -99,7 +99,7 @@ CI rejects a manifest that breaks these rules. The word lists are plain text in
   placeholder from [policy/placeholders.txt](policy/placeholders.txt), at most
   three brands, and no banned word except `free` and `plugin`. Brands written
   as `str-ipe` or `g00gle` count, and so do look-alike letters. A domain written
-  with non-ASCII letters, or with `。` after a Latin letter, counts as a domain.
+  with non-ASCII letters, or with `。` after a Latin letter and a non-CJK word after it, counts as a domain.
   The `plugin.json` must be one JSON object whose keys are lowercase
   identifiers (`description`, not `Description`).
 
