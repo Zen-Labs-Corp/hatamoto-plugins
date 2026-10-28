@@ -3,11 +3,17 @@
 # theme tests. No secrets, no signing: publishing is done by the Hatamoto release
 # manager, never by CI.
 #
-# The `judge` job validates plugin manifests and runs only base-branch code: the
+# The `judge` job reports on every pull request and runs only base-branch code: the
 # validator script and the policy/ word lists come from the base branch, and no pull
-# request code runs in that job. The base branch must already carry policy/; until it
-# does the job fails closed when plugin manifests change. A pull request that edits
-# the workflow or scripts is covered by maintainer review, not by this job.
+# request code runs in that job. When a pull request changes nothing relevant it prints
+# a note and passes. When it changes policy/ or manifests/themes/ it re-judges every
+# plugin manifest in the repository with the base rules, not only the changed ones.
+# The base branch must already carry policy/; until it does the job fails closed when
+# plugin manifests are judged. A pull request that edits the workflow or scripts is
+# covered by maintainer review, not by this job. The Hatamoto registry build
+# (registry/build-community.sh and build-community-themes.sh in the Hatamoto core
+# repository) reads the same policy/ from a checkout of this repository, and a missing,
+# unreadable or empty list stops that build.
 #
 # The `build` job compiles each changed plugin (themes have no build and no SDK) at its pinned commit. It needs the
 # public Hatamoto SDK (hatamoto.dev/sdk); it runs only when the repository variable
@@ -16,12 +22,6 @@ name: validate
 
 on:
   pull_request:
-    paths:
-      - 'manifests/**'
-      - 'policy/**'
-      - 'scripts/**'
-      - 'schemas/**'
-      - 'tests/**'
 
 permissions:
   contents: read
@@ -63,15 +63,31 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Judge changed plugin manifests with the base branch validator and policy
+      - name: Judge plugin manifests with the base branch validator and policy
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
           status=0
-          # 1. The changed plugin manifests. Type changes are listed; only regular files pass.
+          work=$(mktemp -d)
+          trap 'rm -rf "$work"' EXIT
+          # 1. What to judge: the changed manifests (type changes included, deletions not),
+          # plus every tracked plugin manifest when policy/ or manifests/themes/ changed.
+          # Deletions count for the sweep. Both lists are written first so a git failure stops the job.
+          git diff -z --name-only --diff-filter=AMRT "origin/$BASE_REF...HEAD" -- manifests > "$work/changed"
+          git diff -z --name-only "origin/$BASE_REF...HEAD" -- policy manifests/themes > "$work/sweepers"
+          sweep=0
+          if [ -s "$work/sweepers" ]; then
+            sweep=1
+            git ls-files -z -- 'manifests/*.json' > "$work/tracked"
+          else
+            : > "$work/tracked"
+          fi
           files=()
+          declare -A seen=()
           while IFS= read -r -d '' f; do
+            if [ -n "${seen[$f]:-}" ]; then continue; fi
+            seen[$f]=1
             case "$f" in
               manifests/README.md | manifests/schema.json | manifests/themes/README.md | manifests/themes/*.json) continue ;;
               manifests/*.json) ;;
@@ -89,11 +105,14 @@ jobs:
               status=1; continue
             fi
             files+=("$f")
-          done < <(git diff -z --name-only --diff-filter=AMRT "origin/$BASE_REF...HEAD" -- manifests)
-          if [ "${#files[@]}" -eq 0 ]; then exit "$status"; fi
+          done < <(cat "$work/changed" "$work/tracked")
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "judge: no plugin manifests, policy or themes changed; nothing to judge"
+            exit "$status"
+          fi
+          if [ "$sweep" -eq 1 ]; then echo "judge: policy or themes changed; judging every plugin manifest"; fi
           # 2. Copy the validator and policy from the base branch, once. Any failure stops the job.
-          trusted=$(mktemp -d)
-          trap 'rm -rf "$trusted"' EXIT
+          trusted="$work/trusted"
           mkdir -p "$trusted/scripts" "$trusted/policy"
           if ! git show "origin/$BASE_REF:scripts/validate-manifest.sh" > "$trusted/scripts/validate-manifest.sh"; then
             echo "the base branch has no validator to judge plugin manifests" >&2

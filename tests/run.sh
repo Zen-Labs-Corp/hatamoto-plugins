@@ -435,6 +435,11 @@ judge=$(awk '/^  judge:/{on=1;print;next} on && /^  [a-z]+:/{exit} on{print}' "$
 if [ -n "$judge" ] && ! grep -Eq 'tests/|scripts/validate-(theme-)?manifest\.sh "\$f"|scripts/check' <<<"$judge"; then ok "judge job runs no pull request code"; else no "judge job runs no pull request code"; fi
 if grep -q 'diff-filter=AMRT' <<<"$judge" && grep -q '100644' <<<"$judge"; then ok "judge job lists type changes and requires regular files"; else no "judge job lists type changes and requires regular files"; fi
 if grep -q 'exit 1' <<<"$judge" && ! grep -q 'fetch_trusted\|return 1\|return 0' <<<"$judge"; then ok "judge job stops when a base file is missing"; else no "judge job stops when a base file is missing"; fi
+# The workflow runs on every pull request, so the required judge check always reports.
+if ! awk '/^on:/{on=1;next} on && /^[a-z]/{exit} on{print}' "$wf" | grep -q 'paths:'; then ok "validate.yml has no pull_request path filter"; else no "validate.yml has no pull_request path filter"; fi
+if grep -q 'nothing to judge' <<<"$judge" && grep -q 'exit "\$status"' <<<"$judge"; then ok "judge prints a note and exits when nothing is relevant"; else no "judge prints a note and exits when nothing is relevant"; fi
+if grep -q 'sweep' <<<"$judge" && grep -q "ls-files -z -- 'manifests/\*.json'" <<<"$judge" && grep -q 'policy manifests/themes' <<<"$judge"; then ok "judge sweeps every plugin manifest on policy or theme changes"; else no "judge sweeps every plugin manifest on policy or theme changes"; fi
+if ! grep -q 'changed-manifests' <<<"$judge"; then ok "judge sweep uses an inline filter, not a pull request script"; else no "judge sweep uses an inline filter, not a pull request script"; fi
 
 # Description look-alikes: combining marks, fullwidth forms and other symbols are refused.
 rd reject "combining marks" "\"Fr$(printf '\u0301')ee and pr$(printf '\u0301')emium tooling for your team\"" "may contain only"
