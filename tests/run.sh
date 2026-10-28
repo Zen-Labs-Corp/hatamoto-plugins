@@ -372,6 +372,7 @@ rj reject "Description key" '{"name":"descy","sdk":"^0.10","Description":"A cale
 rj reject "Name key" '{"Name":"descy","sdk":"^0.10"}' "$k"
 rj reject "long-s key" '{"name":"descy","sdk":"^0.10","de\u017fcription":"A calendar sync tool"}' "$k"
 rj reject "string" '"deſcription"' "$k"
+rj reject "two values in the file" '{"Description":"spam"} {"name":"descy","sdk":"^0.10","description":"Adds a contact page to a site."}' "$k"
 rj accept "lowercase object" '{"name":"descy","sdk":"^0.10","description":"Adds a contact page to a site."}'
 # fold: maths alphanumerics, long s, Kelvin/Angstrom, small capitals, ligatures, Roman numerals.
 eval "$(sed -n '/^fold_def=/,/^'"'"'$/p' "$v")"
