@@ -110,16 +110,29 @@ jv() {
   r=$(jq -n --arg t "$v" "$@" "$f") || { bad "$l could not be checked"; return 1; }
   [ "$r" = true ]
 }
-# fold: look-alike letters (Cyrillic, Greek, a few Latin) to ASCII, for the word and brand
-# comparisons only. Pairs of code points: look-alike, ASCII letter.
+# fold: look-alike letters (Cyrillic, Greek, Latin variants, maths alphanumerics, ligatures,
+# Roman numerals) to ASCII, for the word and brand comparisons only. Pairs of code points:
+# look-alike, ASCII letter. keep in sync with Hatamoto core registry/build-community.sh
 fold_def='def fold:
   ([[1072,97],[1074,98],[1077,101],[1109,115],[1110,105],[1112,106],[1082,107],[1084,109],[1085,104],[1086,111],[1088,112],[1089,99],[1090,116],[1091,121],[1093,120],[1231,108],
     [1040,97],[1042,98],[1045,101],[1029,115],[1030,105],[1032,106],[1050,107],[1052,109],[1053,104],[1054,111],[1056,112],[1057,99],[1058,116],[1059,121],[1061,120],[1216,108],
     [959,111],[945,97],[949,101],[953,105],[954,107],[957,118],[961,112],[964,116],[965,117],[967,120],
     [927,111],[913,97],[917,101],[921,105],[922,107],[925,110],[929,112],[932,116],[933,121],[935,120],[914,98],[918,122],[919,104],[924,109],
-    [609,103],[305,105],[304,105],[593,97]]
+    [609,103],[305,105],[304,105],[593,97],
+    [383,115],[8490,107],[8491,97],
+    [7424,97],[7427,98],[7428,99],[7429,100],[7431,101],[7434,106],[7435,107],[7437,109],[7439,111],[7448,112],[7451,116],[7452,117],[7456,118],[7457,119],[7458,122],
+    [665,98],[610,103],[668,104],[618,105],[671,108],[628,110],[640,114],[655,121]]
    | map({(.[0] | tostring): .[1]}) | add) as $m
-  | explode | map($m[tostring] // .) | implode | ascii_downcase;
+  | explode | map(. as $c
+    | if $m[$c | tostring] then $m[$c | tostring]
+      elif $c >= 119808 and $c <= 120483 then (($c - 119808) % 52) as $n | (if $n < 26 then 65 + $n else 71 + $n end)
+      elif $c == 120484 then 105 elif $c == 120485 then 106
+      elif $c >= 120782 and $c <= 120831 then 48 + (($c - 120782) % 10)
+      elif $c >= 8544 and $c <= 8575 then (["i","ii","iii","iv","v","vi","vii","viii","ix","x","xi","xii","l","c","d","m"][($c - 8544) % 16] | explode)
+      elif $c >= 64256 and $c <= 64262 then (["ff","fi","fl","ffi","ffl","st","st"][$c - 64256] | explode)
+      elif $c == 306 or $c == 307 then [105, 106]
+      else $c end)
+  | flatten | implode | ascii_downcase;
 '
 # Emoji, symbols and invisible characters (not \p{Emoji}: that is true for digits).
 unsafe_chars_filter='$t | test("\\p{Cf}|\\p{Co}|\\p{Cs}|\\p{So}|\\p{Sk}|\\p{Extended_Pictographic}|\\p{Emoji_Presentation}")'

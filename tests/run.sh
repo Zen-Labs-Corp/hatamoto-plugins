@@ -344,6 +344,36 @@ rj reject "Name key" '{"Name":"descy","sdk":"^0.10"}' "$k"
 rj reject "long-s key" '{"name":"descy","sdk":"^0.10","de\u017fcription":"A calendar sync tool"}' "$k"
 rj reject "string" '"deſcription"' "$k"
 rj accept "lowercase object" '{"name":"descy","sdk":"^0.10","description":"Adds a contact page to a site."}'
+# fold: maths alphanumerics, long s, Kelvin/Angstrom, small capitals, ligatures, Roman numerals.
+eval "$(sed -n '/^fold_def=/,/^'"'"'$/p' "$v")"
+fold_t() {
+  local got
+  got=$(jq -nr --arg t "$1" "$fold_def"'$t | fold' 2>&1)
+  if [ "$got" = "$2" ]; then ok "fold $1 -> $2"; else no "fold $1 -> $2 (got: $got)"; fi
+}
+fold_t "$(printf '\U1D42C\U1D42D\U1D42B\U1D422\U1D429\U1D41E')" stripe
+fold_t "$(printf '\U1D5A2')" c
+fold_t "$(printf '\U1D7CE\U1D7FF')" 09
+fold_t "$(printf '\u017f')" s
+fold_t "$(printf '\u212a')" k
+fold_t "$(printf '\u212b')" a
+fold_t "$(printf '\u1d00')" a
+fold_t "$(printf '\u0299\u0262\u029c\u026a\u029f\u0274\u0280\u028f')" bghilnry
+fold_t "$(printf '\ufb01')" fi
+fold_t "$(printf '\ufb02')" fl
+fold_t "$(printf '\ufb03')" ffi
+fold_t "$(printf '\u0133')" ij
+fold_t "$(printf '\u2171')" ii
+fold_t "$(printf '\u2172')" iii
+fold_t "$(printf '\u2173')" iv
+fold_t "$(printf '\u217a')" xi
+fold_t "$(printf '\u2170')" i
+fold_t "Plain Text" "plain text"
+M=$(printf '\U1D42C\U1D42D\U1D42B\U1D422\U1D429\U1D41E')
+rd reject "maths-bold brand is the 4th" "\"Works with $M, google, hubspot and zapier.\"" "names more than 3 brands"
+rd reject "ligature brand" '"Works with cloud\ufb02are, stripe, google and hubspot."' "names more than 3 brands"
+rd reject "Kelvin and small-capital brand" "\"Works with $(printf 's\u1d1b\u0280ipe'), google, hubspot and zap\u0069er.\"" "names more than 3 brands"
+rd reject "Kelvin brand" "\"Works with stripe, google, hubspot and tikto$(printf '\u212a').\"" "names more than 3 brands"
 rd accept "plain sentence" '"Adds a contact page to a site."'
 rd accept "two sentences" '"Adds a contact page. Works with any theme."'
 rd accept "free and plugin allowed" '"A free plugin that adds a contact page."'
