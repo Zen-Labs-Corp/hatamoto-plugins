@@ -3,6 +3,11 @@
 # theme tests. No secrets, no signing: publishing is done by the Hatamoto release
 # manager, never by CI.
 #
+# Plugin manifests are judged by the validator script and the policy/ word lists of
+# the base branch, never by the copies in the pull request, so a pull request cannot
+# weaken its own check. The base branch must already carry policy/; until it does the
+# plugin check fails closed.
+#
 # The `build` job compiles each changed plugin (themes have no build and no SDK) at its pinned commit. It needs the
 # public Hatamoto SDK (hatamoto.dev/sdk); it runs only when the repository variable
 # SDK_PUBLIC is 'true', which is set once the SDK repository is published.
@@ -12,6 +17,7 @@ on:
   pull_request:
     paths:
       - 'manifests/**'
+      - 'policy/**'
       - 'scripts/**'
       - 'schemas/**'
       - 'tests/**'
@@ -39,6 +45,19 @@ jobs:
         run: |
           set -euo pipefail
           status=0
+          trusted=""
+          trap 'rm -rf "$trusted"' EXIT
+          # Copy the validator and policy from the base branch, once, when the first
+          # plugin manifest is validated. A missing file fails closed.
+          fetch_trusted() {
+            [ -z "$trusted" ] || return 0
+            trusted=$(mktemp -d)
+            mkdir -p "$trusted/scripts" "$trusted/policy"
+            git show "origin/$BASE_REF:scripts/validate-manifest.sh" > "$trusted/scripts/validate-manifest.sh" || return 1
+            for p in reserved-names banned-tokens banned-words brands placeholders; do
+              git show "origin/$BASE_REF:policy/$p.txt" > "$trusted/policy/$p.txt" || return 1
+            done
+          }
           while IFS= read -r -d '' f; do
             case "$f" in
               manifests/README.md | manifests/schema.json | manifests/themes/README.md) continue ;;
@@ -52,7 +71,11 @@ jobs:
               echo "$f: file name must be <name>.json with a valid plugin name" >&2
               status=1; continue
             fi
-            scripts/validate-manifest.sh "$f" --remote || status=1
+            if ! fetch_trusted; then
+              echo "$f: the base branch has no validator or policy/ to judge this manifest" >&2
+              status=1; continue
+            fi
+            bash "$trusted/scripts/validate-manifest.sh" "$f" --remote || status=1
           done < <(git diff -z --name-only --diff-filter=AMR "origin/$BASE_REF...HEAD" -- manifests)
           exit "$status"
 
