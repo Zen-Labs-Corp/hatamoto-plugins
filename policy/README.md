@@ -1,8 +1,8 @@
 # Listing policy
 
 Plain-text word lists behind the plugin listing rules. One entry per line;
-lines starting with `#` and blank lines are ignored; matching is
-case-insensitive.
+lines starting with `# ` (hash and space) and blank lines are ignored, so `#1` is an
+entry; matching is case-insensitive.
 
 | File | Entries |
 |---|---|

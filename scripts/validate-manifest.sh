@@ -52,9 +52,9 @@ for p in reserved-names banned-tokens banned-words brands placeholders; do
   if [ ! -r "$pol/$p.txt" ]; then bad "missing policy: $p.txt"; policy_ok=0; fi
 done
 [ "$policy_ok" -eq 1 ] || exit 1
-# plist <list>: entries, trimmed and lowercased, without blanks and # comments.
+# plist <list>: entries, trimmed and lowercased, without blank lines and "# " comments.
 plist() {
-  jq -Rr 'ascii_downcase | gsub("\r"; "") | gsub("^\\s+|\\s+$"; "") | select(. != "" and (startswith("#") | not))' "$pol/$1.txt"
+  jq -Rr 'ascii_downcase | gsub("\r"; "") | gsub("^\\s+|\\s+$"; "") | select(. != "" and . != "#" and (startswith("# ") | not))' "$pol/$1.txt"
 }
 reserved_names=$(plist reserved-names)
 banned_tokens=$(plist banned-tokens)
@@ -89,6 +89,17 @@ lev1() {
 }
 # lkey <name>: hyphens removed, 0 1 3 5 folded to o l e s.
 lkey() { printf '%s' "$1" | tr -d '-' | tr '0135' 'oles'; }
+
+# jv <value> <jq filter> <label> [jq args...]: true when the filter holds. The
+# filter is a literal; the value only enters as --arg t. A jq failure rejects.
+jv() {
+  local v=$1 f=$2 l=$3 r
+  shift 3
+  r=$(jq -n --arg t "$v" "$@" "$f") || { bad "$l could not be checked"; return 1; }
+  [ "$r" = true ]
+}
+# Emoji, symbols and invisible characters (not \p{Emoji}: that is true for digits).
+unsafe_chars_filter='$t | test("\\p{Cf}|\\p{Co}|\\p{Cs}|\\p{So}|\\p{Sk}|\\p{Extended_Pictographic}|\\p{Emoji_Presentation}")'
 
 # field <name>: the string value, or empty when absent or not a string.
 field() { jq -r --arg k "$1" 'if (.[$k] | type) == "string" then .[$k] else "" end' "$file"; }
@@ -236,14 +247,8 @@ if has title; then
   if [ -z "$title" ] || [ "${#title}" -gt 40 ] || [[ $title =~ [[:cntrl:]] ]] || [[ $title == " "* ]] || [[ $title == *" " ]]; then
     bad "title must be 1 to 40 characters, no control characters, no leading or trailing space"
   elif [ -n "$title" ]; then
-    # jt <jq filter>: the filter is a literal; the title only enters as --arg.
-    # A jq failure rejects (fail closed).
-    jt() {
-      local r
-      r=$(jq -n --arg t "$title" "$1") || { bad "title could not be checked"; return 1; }
-      [ "$r" = true ]
-    }
-    if jt '$t | test("\\p{Cf}|\\p{Co}|\\p{Cs}|\\p{So}|\\p{Sk}|\\p{Extended_Pictographic}|\\p{Emoji_Presentation}")'; then
+    jt() { jv "$title" "$1" title; }
+    if jt "$unsafe_chars_filter"; then
       bad "title must not contain emoji, symbols or invisible characters"
     fi
     if jt '[$t | scan("[:,&/|+]")] | length > 1'; then
@@ -353,6 +358,47 @@ if [ "$remote" -eq 1 ]; then
     echo "$file: plugin.json sdk \"$psdk\" does not match manifest sdk \"$sdk\"" >&2
     exit 1
   fi
+
+  # Description (from plugin.json at the pinned commit): data only, via --arg.
+  if ! printf '%s' "$pj" | jq -e '.description | type == "string"' >/dev/null 2>&1; then
+    bad "plugin.json description must be a string of 20 to 160 characters"
+  else
+    pdesc=$(printf '%s' "$pj" | jq -r '.description')
+    jd() { jv "$pdesc" "$1" description "${@:2}"; }
+    if [ "${#pdesc}" -lt 20 ] || [ "${#pdesc}" -gt 160 ] || [[ $pdesc =~ [[:cntrl:]] ]]; then
+      bad "plugin.json description must be 20 to 160 characters without control characters"
+    fi
+    if jd '[$t | scan("[.!?。！？]")] | length > 2'; then
+      bad "plugin.json description must have at most two sentence terminators"
+    fi
+    if jd '$t | test("://|www\\.|[A-Za-z0-9-]+\\.[A-Za-z]{2,}"; "i")'; then
+      bad "plugin.json description must not contain a URL or domain"
+    fi
+    if jd "$unsafe_chars_filter"; then
+      bad "plugin.json description must not contain emoji, symbols or invisible characters"
+    fi
+    if jd '($t | ascii_downcase | gsub("^\\s+|\\s+$"; "")) as $d | $d == ($title | ascii_downcase) or $d == $name' --arg title "$title" --arg name "$name"; then
+      bad "plugin.json description must not equal the title or the name"
+    fi
+    dnorm=$(jq -nr --arg t "$pdesc" '$t | ascii_downcase | gsub("^\\s+|\\s+$"; "")') || dnorm=""
+    if inlist "$placeholders" "$dnorm"; then bad "plugin.json description is a placeholder"; fi
+    desc_words=$(jq -nr --arg t "$pdesc" '$t | ascii_downcase | scan("[\\p{L}\\p{N}#]+")') \
+      || { bad "description could not be checked"; desc_words=""; }
+    seen_brands=" "
+    nbrands=0
+    while read -r w; do
+      [ -n "$w" ] || continue
+      if [ "$w" != free ] && [ "$w" != plugin ] && inlist "$banned_words" "$w"; then
+        bad "plugin.json description contains the banned word \"$w\""
+      fi
+      if brand_listed "$w" && [[ $seen_brands != *" $w "* ]]; then
+        seen_brands="$seen_brands$w "
+        nbrands=$((nbrands + 1))
+      fi
+    done <<<"$desc_words"
+    if [ "$nbrands" -gt 3 ]; then bad "plugin.json description names more than 3 brands"; fi
+  fi
+  [ "$fail" -eq 0 ] || exit 1
 fi
 
 echo "$file: ok"

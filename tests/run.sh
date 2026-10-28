@@ -255,6 +255,48 @@ done
 jq '. + {"subdir": "plugins/seo"}' "$f/good.json" > "$tmp/good.json"
 if "$v" "$tmp/good.json" >/dev/null 2>&1; then ok "accepts nested subdir"; else no "accepts nested subdir"; fi
 
+# Description rules: --remote reads plugin.json at the pinned commit (file:/// repos, offline).
+# rd <accept|reject> <label> <plugin.json description as JSON, or "-" for none> [want]
+rd() {
+  local want=$1 label=$2 desc=$3 msg=${4:-} dir="$tmp/rd/own/descy" err
+  rm -rf "$dir" "$tmp/rd/manifests"; mkdir -p "$dir" "$tmp/rd/manifests"
+  if [ "$desc" = "-" ]; then jq -n '{name: "descy", sdk: "^0.10"}' > "$dir/plugin.json"
+  else jq -n --argjson d "$desc" '{name: "descy", sdk: "^0.10", description: $d}' > "$dir/plugin.json"; fi
+  git -C "$dir" init -q
+  git -C "$dir" add -A
+  git -C "$dir" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -q -m init
+  jq --arg r "file://$dir" --arg c "$(git -C "$dir" rev-parse HEAD)" \
+    '.name = "descy" | .repo = $r | .commit = $c | .author = "own" | .title = "Descy Tools"' "$f/good.json" > "$tmp/rd/manifests/descy.json"
+  if err=$(HATAMOTO_ALLOW_FILE_REPOS=1 "$v" "$tmp/rd/manifests/descy.json" --remote 2>&1 >/dev/null); then
+    [ "$want" = accept ] && ok "description accepted: $label" || no "description accepted: $label"
+  elif [ "$want" = accept ]; then no "description accepted: $label: $err"
+  elif [[ $err == *"$msg"* ]]; then ok "description rejected: $label"
+  else no "description rejected: $label: $err"; fi
+}
+rd accept "plain sentence" '"Adds a contact page to a site."'
+rd accept "two sentences" '"Adds a contact page. Works with any theme."'
+rd accept "free and plugin allowed" '"A free plugin that adds a contact page."'
+rd accept "two brands" '"Sends form entries to Slack and Zapier."'
+rd accept "Japanese" '"お問い合わせページをサイトに追加します。簡単に使えます。"'
+rd reject "missing" - "must be a string"
+rd reject "not a string" '5' "must be a string"
+rd reject "too short" '"Too short."' "20 to 160"
+rd reject "too long" "\"$(printf 'a%.0s' $(seq 161))\"" "20 to 160"
+rd reject "three terminators" '"Adds a page. Works well. Is fast!"' "terminators"
+rd reject "fullwidth terminators" '"サイトに追加します。簡単です。使えます。"' "terminators"
+rd reject "URL scheme" '"Docs at http://example.com for the page"' "URL"
+rd reject "www" '"Visit www example and www.example for more"' "URL"
+rd reject "bare domain" '"Adds a contact page, see example.com now"' "URL"
+rd reject "emoji" "\"Adds a contact page $(printf '\U0001F600') to a site\"" "emoji"
+rd reject "zero width" "\"Adds a contact$(printf '\u200b') page to a site\"" "emoji, symbols or invisible"
+rd reject "control character" '"Adds a contact page\nto a site today"' "control characters"
+rd reject "placeholder" '"One sentence a site owner will read in the plugin directory."' "placeholder"
+rd reject "placeholder, other case" '"  one SENTENCE a site owner will read in the plugin directory.  "' "placeholder"
+rd reject "equals the title" '"descy tools"' "equal the title"
+rd reject "four brands" '"Connects Slack, Zapier, Notion and Github now"' "more than 3 brands"
+rd reject "banned word" '"The best contact page for your site"' 'banned word "best"'
+rd reject "banned word #1" '"Adds a contact page, rated #1 by users"' 'banned word "#1"'
+
 # scripts/check-gomod.sh: plain-module rules of the registry build.
 if command -v go >/dev/null; then
   g=scripts/check-gomod.sh
