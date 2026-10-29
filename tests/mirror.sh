@@ -258,8 +258,14 @@ manifest fpbad "$tmp/up/amber" "$sha" '.tier = "first-party" | .repo = "https://
 out=$(env -u MIRROR_BASE -u MIRROR_CREATE PATH="$tmp/ghbin:$PATH" "$m" "$tmp/manifests/fpbad.json" 2>&1); rc=$?
 if [ $rc -ne 0 ] && [[ $out != *skipped* ]] && [ ! -e "$tmp/mirrors/fpbad" ]; then ok "invalid first-party manifest fails, not skipped"; else no "invalid first-party: $out"; fi
 
+# Tier half: exact first-party repo but no tier (community) is never skipped.
+manifest nofp "$tmp/up/amber" "$sha" '.repo = "https://github.com/Zen-Labs-Corp/hatamoto-first-party" | .author = "Zen-Labs-Corp"'
+out=$(env -u MIRROR_BASE -u MIRROR_CREATE -u MIRROR_ORG -u GH_TOKEN PATH="$tmp/ghbin:$PATH" "$m" "$tmp/manifests/nofp.json" 2>&1); rc=$?
+if [[ $out != *"skipped: first-party"* ]] && [ ! -e "$tmp/mirrors/nofp" ]; then ok "no tier on the first-party repo is not skipped (rc=$rc)"; else no "no-tier skipped: $out"; fi
+# Homoglyph repo (dotted capital I) case skipped: the validator rejects non-ASCII repos before the skip.
+
 # Fail when cases silently disappear.
-want=43
+want=44
 if [ $((pass + failed)) -ne "$want" ]; then no "expected $want cases, ran $((pass + failed))"; fi
 
 echo "$pass passed, $failed failed"

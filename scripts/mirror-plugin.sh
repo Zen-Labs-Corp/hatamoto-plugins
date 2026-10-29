@@ -51,7 +51,8 @@ subdir=${subdir%/}
 # monorepo. Runs after validation and before any env, token, git or gh handling.
 tier=$(field tier)
 first_party_repo='^https://github\.com/zen-labs-corp/hatamoto-first-party(\.git)?$'
-if [ "$tier" = first-party ] && [[ ${repo,,} =~ $first_party_repo ]]; then
+repo_lc=$(printf '%s' "$repo" | LC_ALL=C tr 'A-Z' 'a-z')  # ASCII-only: no Unicode case folding
+if [ "$tier" = first-party ] && [[ $repo_lc =~ $first_party_repo ]]; then
   echo "mirror-plugin: $name: skipped: first-party (source of record is Zen-Labs-Corp/hatamoto-first-party)"
   exit 0
 fi
