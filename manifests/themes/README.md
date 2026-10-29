@@ -36,6 +36,8 @@ Pick exactly one source.
 | `archive_grant` | must be the JSON value `true`: you allow Hatamoto to repack, sign and redistribute the theme |
 | `title` | optional, 1 to 60 characters, no control characters, no leading or trailing space |
 | `homepage` | optional, `https://` |
+| `about` | optional. Plain text, never HTML or Markdown. `about` is 1 to 1500 characters in at most 10 paragraphs separated by a single newline (no empty paragraph, no leading or trailing space in a paragraph, no control character other than that newline). `features` is a list of 1 to 8 distinct items of 1 to 120 characters each (no control character, no leading or trailing space; duplicates are compared without case). Neither may contain `<`, `>` or a URL (`://`, `www.`), and emoji, symbols and invisible characters are refused. Both are optional. Do not put a trailing newline at the end of `about`. |
+| `features` | optional, short bullet list for the theme page; same rules, see `about` |
 
 No other fields are allowed. Themes need no `sdk` field and have no `tier`.
 

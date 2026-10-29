@@ -81,6 +81,89 @@ mutate "61-char CJK title" '. + {title: ("\u65e5" * 61)}' "title must be"
 jq '. + {subdir: "themes/kumo"}' "$f/good-git-codeberg.json" > "$tmp/good-git-codeberg.json"
 if "$v" "$tmp/good-git-codeberg.json" >/dev/null 2>&1; then ok "accepts nested subdir"; else no "accepts nested subdir"; fi
 
+# about and features: same helper and rules as the plugin tests.
+abfile() { mkdir -p "$tmp/ab"; jq "$1" "$f/good-git-codeberg.json" > "$tmp/ab/good-git-codeberg.json"; }
+# about and features: 1 to 1500 characters in at most 10 newline-separated paragraphs; 1 to 8
+# distinct features of 1 to 120 characters. ab <accept|reject> <label> <jq-mutation> [want]:
+# a rejection must print the want substring (core's wording), also under LC_ALL=C.
+ab() {
+  local err
+  abfile "$3"
+  if err=$(LC_ALL=${ABLOC:-C.UTF-8} "$v" "$tmp/ab/good-git-codeberg.json" 2>&1 >/dev/null); then [ "$1" = accept ] && ok "about/features accepted: $2" || no "about/features accepted: $2"
+  elif [ "$1" = accept ]; then no "about/features accepted: $2: $err"
+  elif [[ $err == *"${4:-}"* ]]; then ok "about/features rejected: $2"
+  else no "about/features rejected: $2: $err"; fi
+}
+x1501='([range(1501)|"x"]|join(""))'
+ab accept "no fields" '.'
+ab accept "both fields" '.about = "First paragraph.\nSecond paragraph." | .features = ["Fast", "Tiny"]'
+ab accept "about only" '.about = "One paragraph."'
+ab accept "features only" '.features = ["Fast"]'
+ab accept "1500-character about" '.about = ([range(1500)|"x"]|join(""))'
+ab accept "10 paragraphs" '.about = ([range(10)|"p"]|join("\n"))'
+ab accept "8 features" '.features = [range(8)|"item \(.)"]'
+ab accept "120-character feature" '.features = [([range(120)|"x"]|join(""))]'
+ab accept "digits and CJK" '.about = "Works with 3D views.\n\u65e5\u672c\u8a9e\u3082\u4f7f\u3048\u307e\u3059" | .features = ["\u65e5\u672c\u8a9e"]'
+ab reject "abstract is still unknown" '.about = "ok" | .abstract = "x"' "unknown field(s): abstract"
+ab reject "about too long" ".about = $x1501" "about must be 1 to 1500"
+ab reject "about empty" '.about = ""' "about must be 1 to 1500"
+ab reject "about not a string" '.about = 5' "about must be a string"
+ab reject "about control char" '.about = "a\u0007b"' "about must not contain control"
+ab reject "about tab" '.about = "a\tb"' "about must not contain control"
+ab reject "about carriage return" '.about = "a\r\nb"' "about must not contain control"
+ab reject "about DEL" '.about = "a\u007fb"' "about must not contain control"
+ab reject "about C1 control" '.about = "a\u0085b"' "about must not contain control"
+ab reject "about url" '.about = "see https://example.test/x"' "about must not contain a URL"
+ab reject "about www" '.about = "see www.example.test"' "about must not contain a URL"
+ab reject "about uppercase url" '.about = "see HTTPS://example.test"' "about must not contain a URL"
+ab reject "about uppercase www" '.about = "see WWW.example.test"' "about must not contain a URL"
+ab reject "about angle bracket" '.about = "a <b> c"' "about must not contain < or >"
+ab reject "about empty paragraph" '.about = "one\n\ntwo"' "about must not have an empty paragraph"
+ab reject "about trailing newline" '.about = "one\n"' "about must not have an empty paragraph"
+ab reject "about edge space" '.about = " one"' "about must not start or end with whitespace"
+ab reject "about trailing space" '.about = "one "' "about must not start or end with whitespace"
+ab reject "about eleven paragraphs" '.about = ([range(11)|"p"]|join("\n"))' "about must have at most 10 paragraphs"
+ab reject "about emoji" '.about = "Great \ud83d\ude80 theme"' "about must not contain emoji"
+ab reject "about zero-width edge" '.about = "\u200bone"' "emoji, symbols or invisible characters"
+ab reject "about soft hyphen" '.about = "a\u00adb"' "emoji, symbols or invisible characters"
+ab reject "about hangul filler" '.about = "a\u3164b"' "emoji, symbols or invisible characters"
+ab reject "about modifier letter" '.about = "a\u02b0b"' "emoji, symbols or invisible characters"
+ab reject "features not a list" '.features = "a"' "features must be a list of strings"
+ab reject "features non-string item" '.features = ["a", 5]' "features must be a list of strings"
+ab reject "features empty list" '.features = []' "features must list 1 to 8"
+ab reject "features nine items" '.features = [range(9)|"item \(.)"]' "features must list 1 to 8"
+ab reject "features long item" '.features = [([range(121)|"x"]|join(""))]' "each feature must be 1 to 120"
+ab reject "features empty item" '.features = ["a", ""]' "each feature must be 1 to 120"
+ab reject "features newline" '.features = ["a\nb"]' "a feature must not contain control"
+ab reject "features DEL" '.features = ["a\u007fb"]' "a feature must not contain control"
+ab reject "features C1 control" '.features = ["a\u0085b"]' "a feature must not contain control"
+ab reject "features url" '.features = ["see https://example.test"]' "a feature must not contain a URL"
+ab reject "features angle bracket" '.features = ["<b>"]' "a feature must not contain < or >"
+ab reject "features edge space" '.features = ["a "]' "a feature must not start or end with whitespace"
+ab reject "features duplicate" '.features = ["Fast", "fast"]' "features must not repeat an item"
+ab reject "features emoji" '.features = ["Fast \ud83d\ude80"]' "a feature must not contain emoji"
+ab reject "features hangul filler" '.features = ["a\u3164b"]' "emoji, symbols or invisible characters"
+ab reject "features modifier letter" '.features = ["a\u02b0b"]' "emoji, symbols or invisible characters"
+ab reject "features soft hyphen" '.features = ["a\u00adb"]' "emoji, symbols or invisible characters"
+# Both groups are judged: a bad about and a bad feature each report.
+abfile '.about = "a <b>" | .features = ["Fast", "fast"]'
+err=$("$v" "$tmp/ab/good-git-codeberg.json" 2>&1 >/dev/null)
+if [[ $err == *"about must not contain < or >"* && $err == *"features must not repeat an item"* ]]; then ok "about and features both reported"; else no "about and features both reported: $err"; fi
+
+# The same verdicts under the C locale (lengths count characters).
+ABLOC=C
+ab accept "1500-character about (LC_ALL=C)" '.about = ([range(1500)|"x"]|join(""))'
+ab accept "CJK about of 1500 characters (LC_ALL=C)" '.about = ([range(1500)|"\u65e5"]|join(""))'
+ab reject "1501-character about (LC_ALL=C)" '.about = ([range(1501)|"\u65e5"]|join(""))' "about must be 1 to 1500"
+ab reject "hangul filler (LC_ALL=C)" '.about = "a\u3164b"' "emoji, symbols or invisible characters"
+ABLOC=C.UTF-8
+
+# Every theme manifest of the registry keeps passing.
+for m in manifests/themes/*.json; do
+  [ -e "$m" ] || continue
+  if "$v" "$m" >/dev/null 2>&1; then ok "registry theme $m accepted"; else no "registry theme $m accepted"; fi
+done
+
 # Archive source forbids subdir.
 jq '. + {subdir: "x"}' "$f/good-archive.json" > "$tmp/good-archive.json"
 if err=$("$v" "$tmp/good-archive.json" 2>&1 >/dev/null); then no "archive rejects subdir"
@@ -282,6 +365,13 @@ PY
   smut "plain public repo host" accept '.repo = "https://example.com/a/b"'
   smut "61-char title" reject '. + {title: ("x" * 61)}'
   smut "25 CJK title" accept '. + {title: ("\u65e5" * 25)}'
+  smut "about and features" accept '. + {about: "First paragraph.\nSecond paragraph.", features: ["Fast", "Tiny"]}'
+  smut "1500-character about" accept '. + {about: ([range(1500)|"x"]|join(""))}'
+  smut "8 features" accept '. + {features: [range(8)|"item \(.)"]}'
+  for c in '. + {about: ([range(1501)|"x"]|join(""))}' '. + {about: "a <b> c"}' '. + {about: "a\tb"}' '. + {about: ""}' '. + {about: 5}' \
+    '. + {features: [range(9)|"item \(.)"]}' '. + {features: [([range(121)|"x"]|join(""))]}' '. + {features: ["a", 5]}' '. + {features: []}' '. + {features: ["a\nb"]}' '. + {features: ["<b>"]}' '. + {features: "a"}'; do
+    smut "about/features: $c" reject "$c"
+  done
 elif [ "${SCHEMA_TESTS_ALLOW_SKIP:-}" = 1 ]; then
   echo "skip schema tests: python3 jsonschema not found (SCHEMA_TESTS_ALLOW_SKIP=1)"
 else

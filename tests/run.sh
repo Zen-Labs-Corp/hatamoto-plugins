@@ -170,6 +170,10 @@ for m in manifests/*.json; do
   if "$v" "$m" >/dev/null 2>&1; then ok "registry manifest $m accepted"; else no "registry manifest $m accepted"; fi
 done
 
+# about and features: optional listing text. abfile <jq-mutation> builds $tmp/ab/good.json from good.json.
+# The mutation is jq program text from this file (never from a manifest); long values come from jq.
+abfile() { mkdir -p "$tmp/ab"; jq "$1" "$f/good.json" > "$tmp/ab/good.json"; }
+
 # manifests/schema.json agrees on the same cases. Needs python3 jsonschema; a missing
 # module fails the suite unless SCHEMA_TESTS_ALLOW_SKIP=1.
 if python3 -c 'import jsonschema' >/dev/null 2>&1; then
@@ -202,6 +206,13 @@ PY
   for r in webhooks hello; do fp "$r" zenlabscorp; sc reject "first-party reserved name $r" "$tmp/$r.json"; done
   fp searchconsole zenlabscorp; sc accept "first-party searchconsole" "$tmp/searchconsole.json"
   fp searchconsole acme; sc reject "first-party searchconsole from acme" "$tmp/searchconsole.json"
+  abfile '.about = "First paragraph.\nSecond paragraph." | .features = ["Fast", "Tiny"]'; sc accept "about and features" "$tmp/ab/good.json"
+  for case in '.about = ([range(1501)|"x"]|join(""))' '.about = "a <b> c"' '.about = "a\tb"' '.about = ""' '.about = 5' \
+    '.features = [range(9)|"item \(.)"]' '.features = [([range(121)|"x"]|join(""))]' '.features = ["a", 5]' '.features = []' '.features = ["a\nb"]' '.features = ["<b>"]' '.features = "a"'; do
+    abfile "$case"; sc reject "about/features: $case" "$tmp/ab/good.json"
+  done
+  abfile '.about = ([range(1500)|"x"]|join(""))'; sc accept "1500-character about" "$tmp/ab/good.json"
+  abfile '.features = [range(8)|"item \(.)"]'; sc accept "8 features" "$tmp/ab/good.json"
 elif [ "${SCHEMA_TESTS_ALLOW_SKIP:-}" = 1 ]; then
   echo "skip schema tests: python3 jsonschema not found (SCHEMA_TESTS_ALLOW_SKIP=1)"
 else
@@ -339,6 +350,74 @@ for case in '"title": "a\tb"' '"title": "a "' '"title": ""' '"title": " padded"'
   jq ". + {$case}" "$f/good.json" > "$tmp/good.json"
   if "$v" "$tmp/good.json" >/dev/null 2>&1; then no "rejects $case"; else ok "rejects $case"; fi
 done
+
+# about and features: 1 to 1500 characters in at most 10 newline-separated paragraphs; 1 to 8
+# distinct features of 1 to 120 characters. ab <accept|reject> <label> <jq-mutation> [want]:
+# a rejection must print the want substring (core's wording).
+ab() {
+  local err
+  abfile "$3"
+  if err=$("$v" "$tmp/ab/good.json" 2>&1 >/dev/null); then [ "$1" = accept ] && ok "about/features accepted: $2" || no "about/features accepted: $2"
+  elif [ "$1" = accept ]; then no "about/features accepted: $2: $err"
+  elif [[ $err == *"${4:-}"* ]]; then ok "about/features rejected: $2"
+  else no "about/features rejected: $2: $err"; fi
+}
+x1501='([range(1501)|"x"]|join(""))'
+ab accept "no fields" '.'
+ab accept "both fields" '.about = "First paragraph.\nSecond paragraph." | .features = ["Fast", "Tiny"]'
+ab accept "about only" '.about = "One paragraph."'
+ab accept "features only" '.features = ["Fast"]'
+ab accept "1500-character about" '.about = ([range(1500)|"x"]|join(""))'
+ab accept "10 paragraphs" '.about = ([range(10)|"p"]|join("\n"))'
+ab accept "8 features" '.features = [range(8)|"item \(.)"]'
+ab accept "120-character feature" '.features = [([range(120)|"x"]|join(""))]'
+ab accept "digits and CJK" '.about = "Works with 3D views.\n\u65e5\u672c\u8a9e\u3082\u4f7f\u3048\u307e\u3059" | .features = ["\u65e5\u672c\u8a9e"]'
+ab accept "about unknown-key sweep" '.about = "ok"'
+ab reject "abstract is still unknown" '.about = "ok" | .abstract = "x"' "unknown field(s): abstract"
+ab reject "about too long" ".about = $x1501" "about must be 1 to 1500"
+ab reject "about empty" '.about = ""' "about must be 1 to 1500"
+ab reject "about not a string" '.about = 5' "about must be a string"
+ab reject "about control char" '.about = "a\u0007b"' "about must not contain control"
+ab reject "about tab" '.about = "a\tb"' "about must not contain control"
+ab reject "about carriage return" '.about = "a\r\nb"' "about must not contain control"
+ab reject "about DEL" '.about = "a\u007fb"' "about must not contain control"
+ab reject "about C1 control" '.about = "a\u0085b"' "about must not contain control"
+ab reject "about url" '.about = "see https://example.test/x"' "about must not contain a URL"
+ab reject "about www" '.about = "see www.example.test"' "about must not contain a URL"
+ab reject "about uppercase url" '.about = "see HTTPS://example.test"' "about must not contain a URL"
+ab reject "about uppercase www" '.about = "see WWW.example.test"' "about must not contain a URL"
+ab reject "about angle bracket" '.about = "a <b> c"' "about must not contain < or >"
+ab reject "about empty paragraph" '.about = "one\n\ntwo"' "about must not have an empty paragraph"
+ab reject "about trailing newline" '.about = "one\n"' "about must not have an empty paragraph"
+ab reject "about edge space" '.about = " one"' "about must not start or end with whitespace"
+ab reject "about trailing space" '.about = "one "' "about must not start or end with whitespace"
+ab reject "about eleven paragraphs" '.about = ([range(11)|"p"]|join("\n"))' "about must have at most 10 paragraphs"
+ab reject "about emoji" '.about = "Great \ud83d\ude80 plugin"' "about must not contain emoji"
+ab reject "about zero-width edge" '.about = "\u200bone"' "emoji, symbols or invisible characters"
+ab reject "about soft hyphen" '.about = "a\u00adb"' "emoji, symbols or invisible characters"
+ab reject "about hangul filler" '.about = "a\u3164b"' "emoji, symbols or invisible characters"
+ab reject "about modifier letter" '.about = "a\u02b0b"' "emoji, symbols or invisible characters"
+ab reject "features not a list" '.features = "a"' "features must be a list of strings"
+ab reject "features non-string item" '.features = ["a", 5]' "features must be a list of strings"
+ab reject "features empty list" '.features = []' "features must list 1 to 8"
+ab reject "features nine items" '.features = [range(9)|"item \(.)"]' "features must list 1 to 8"
+ab reject "features long item" '.features = [([range(121)|"x"]|join(""))]' "each feature must be 1 to 120"
+ab reject "features empty item" '.features = ["a", ""]' "each feature must be 1 to 120"
+ab reject "features newline" '.features = ["a\nb"]' "a feature must not contain control"
+ab reject "features DEL" '.features = ["a\u007fb"]' "a feature must not contain control"
+ab reject "features C1 control" '.features = ["a\u0085b"]' "a feature must not contain control"
+ab reject "features url" '.features = ["see https://example.test"]' "a feature must not contain a URL"
+ab reject "features angle bracket" '.features = ["<b>"]' "a feature must not contain < or >"
+ab reject "features edge space" '.features = ["a "]' "a feature must not start or end with whitespace"
+ab reject "features duplicate" '.features = ["Fast", "fast"]' "features must not repeat an item"
+ab reject "features emoji" '.features = ["Fast \ud83d\ude80"]' "a feature must not contain emoji"
+ab reject "features hangul filler" '.features = ["a\u3164b"]' "emoji, symbols or invisible characters"
+ab reject "features modifier letter" '.features = ["a\u02b0b"]' "emoji, symbols or invisible characters"
+ab reject "features soft hyphen" '.features = ["a\u00adb"]' "emoji, symbols or invisible characters"
+# Both groups are judged: a bad about and a bad feature each report.
+abfile '.about = "a <b>" | .features = ["Fast", "fast"]'
+err=$("$v" "$tmp/ab/good.json" 2>&1 >/dev/null)
+if [[ $err == *"about must not contain < or >"* && $err == *"features must not repeat an item"* ]]; then ok "about and features both reported"; else no "about and features both reported: $err"; fi
 
 # subdir traversal and homepage scheme.
 for case in '"subdir": "../x"' '"subdir": "/abs"' '"homepage": "http://x.example"'; do
