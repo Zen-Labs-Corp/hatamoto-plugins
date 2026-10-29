@@ -357,7 +357,7 @@ done
 ab() {
   local err
   abfile "$3"
-  if err=$("$v" "$tmp/ab/good.json" 2>&1 >/dev/null); then [ "$1" = accept ] && ok "about/features accepted: $2" || no "about/features rejected: $2"
+  if err=$("$v" "$tmp/ab/good.json" 2>&1 >/dev/null); then [ "$1" = accept ] && ok "about/features accepted: $2" || no "about/features accepted: $2"
   elif [ "$1" = accept ]; then no "about/features accepted: $2: $err"
   elif [[ $err == *"${4:-}"* ]]; then ok "about/features rejected: $2"
   else no "about/features rejected: $2: $err"; fi
