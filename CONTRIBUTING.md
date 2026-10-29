@@ -54,6 +54,8 @@ Add `manifests/<name>.json`, where `<name>` is the `name` in your `plugin.json`:
 | `archive_grant` | yes | must be `true`: your perpetual, irrevocable grant to archive, build, sign and redistribute the source at the pinned commit and its builds |
 | `sdk` | yes | SDK range you built against; matches `plugin.json`; declare `^0.11` unless your users run Hatamoto v0.31.0 or later (older hosts refuse `^0.12`) |
 | `homepage` | no | an `https://` link |
+| `about` | no | longer text for the plugin page; see [About and features](#listing-rules) |
+| `features` | no | list of 1 to 8 short lines for the plugin page; see [About and features](#listing-rules) |
 
 No other keys are allowed. See [manifests/schema.json](manifests/schema.json).
 Check your file before you push:
@@ -93,6 +95,7 @@ CI rejects a manifest that breaks these rules. The word lists are plain text in
   `.` and `'` removed (`Str-ipe` is `Stripe`). Invisible filler characters
   (such as the Hangul filler) and modifier letters (such as `ˢ`) are refused;
   `々` and `ー` stay.
+- **About and features** (optional, in the manifest). Plain text, never HTML or Markdown. `about` is 1 to 1500 characters in at most 10 paragraphs separated by a single newline (no empty paragraph, no leading or trailing space in a paragraph, no control character other than that newline). `features` is a list of 1 to 8 distinct items of 1 to 120 characters each (no control character, no leading or trailing space; duplicates are compared without case). Neither may contain `<`, `>` or a URL (`://`, `www.`), and emoji, symbols and invisible characters are refused. Both are optional. Do not put a trailing newline at the end of `about`. The same rules apply to theme manifests.
 - **Description** (in `plugin.json`). 20 to 160 characters, at most two
   sentence endings, no URL or domain, only letters, digits, spaces and ASCII
   punctuation (no combining marks, fullwidth forms, emoji or symbols), not the title or the name, not a
