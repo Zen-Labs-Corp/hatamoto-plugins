@@ -229,8 +229,43 @@ manifest tau "$tmp/up/tau" "$tsha" '.subdir = "link"'
 if err=$("$m" "$tmp/manifests/tau.json" 2>&1); then no "symlinked subdir refused"
 elif [[ $err == *"symlink"* ]]; then ok "symlinked subdir refused"; else no "symlinked subdir: $err"; fi
 
+# --- first-party manifests are skipped, never mirrored ----------------------
+mkdir -p "$tmp/ghbin"
+printf '#!/bin/sh\ntouch "%s/gh-called"\nexit 1\n' "$tmp" >"$tmp/ghbin/gh"; chmod +x "$tmp/ghbin/gh"
+for case in pine=https://github.com/Zen-Labs-Corp/hatamoto-first-party \
+            quince=https://github.com/zen-labs-corp/Hatamoto-First-Party \
+            rowan=https://github.com/Zen-Labs-Corp/hatamoto-first-party.git; do
+  n=${case%%=*}; url=${case#*=}
+  manifest "$n" "$tmp/up/amber" "$sha" \
+    "del(.author) | .tier = \"first-party\" | .repo = \"$url\""
+  out=$(env -u MIRROR_BASE -u MIRROR_CREATE -u MIRROR_ORG -u GH_TOKEN PATH="$tmp/ghbin:$PATH" "$m" "$tmp/manifests/$n.json" 2>&1); rc=$?
+  if [ $rc -eq 0 ] && [[ $out == *"$n: skipped: first-party"* ]]; then ok "first-party skipped: $url"; else no "first-party skipped: $url (rc=$rc $out)"; fi
+  if [ ! -e "$tmp/mirrors/$n" ] && [ ! -e "$tmp/gh-called" ]; then ok "skip creates no mirror and calls no gh: $url"; else no "skip side effects: $url"; fi
+done
+# Not skipped: tier first-party but another repo; community author zen-labs-corp (file:// owner is the parent dir).
+upstream "$tmp/zen-labs-corp/spruce" spruce 1.0.0
+ssha=$(git -C "$tmp/zen-labs-corp/spruce" rev-parse HEAD)
+manifest spruce "$tmp/zen-labs-corp/spruce" "$ssha" 'del(.author) | .tier = "first-party"'
+out=$("$m" "$tmp/manifests/spruce.json" 2>&1); rc=$?
+if [ $rc -eq 0 ] && [[ $out != *skipped* ]] && [ -d "$tmp/mirrors/spruce" ]; then ok "first-party with another repo is mirrored"; else no "first-party other repo: $out"; fi
+upstream "$tmp/zen-labs-corp/hatamoto-first-party" teak 1.0.0
+tsha2=$(git -C "$tmp/zen-labs-corp/hatamoto-first-party" rev-parse HEAD)
+manifest teak "$tmp/zen-labs-corp/hatamoto-first-party" "$tsha2" '.author = "zen-labs-corp"'
+out=$("$m" "$tmp/manifests/teak.json" 2>&1); rc=$?
+if [ $rc -eq 0 ] && [[ $out != *skipped* ]] && [ -d "$tmp/mirrors/teak" ]; then ok "community manifest is mirrored"; else no "community not skipped: $out"; fi
+# Invalid first-party manifest (author present) still fails before the skip.
+manifest fpbad "$tmp/up/amber" "$sha" '.tier = "first-party" | .repo = "https://github.com/Zen-Labs-Corp/hatamoto-first-party" | .author = "Zen-Labs-Corp"'
+out=$(env -u MIRROR_BASE -u MIRROR_CREATE PATH="$tmp/ghbin:$PATH" "$m" "$tmp/manifests/fpbad.json" 2>&1); rc=$?
+if [ $rc -ne 0 ] && [[ $out != *skipped* ]] && [ ! -e "$tmp/mirrors/fpbad" ]; then ok "invalid first-party manifest fails, not skipped"; else no "invalid first-party: $out"; fi
+
+# Tier half: exact first-party repo but no tier (community) is never skipped.
+manifest nofp "$tmp/up/amber" "$sha" '.repo = "https://github.com/Zen-Labs-Corp/hatamoto-first-party" | .author = "Zen-Labs-Corp"'
+out=$(env -u MIRROR_BASE -u MIRROR_CREATE -u MIRROR_ORG -u GH_TOKEN PATH="$tmp/ghbin:$PATH" "$m" "$tmp/manifests/nofp.json" 2>&1); rc=$?
+if [[ $out != *"skipped: first-party"* ]] && [ ! -e "$tmp/mirrors/nofp" ]; then ok "no tier on the first-party repo is not skipped (rc=$rc)"; else no "no-tier skipped: $out"; fi
+# Homoglyph repo (dotted capital I) case skipped: the validator rejects non-ASCII repos before the skip.
+
 # Fail when cases silently disappear.
-want=34
+want=44
 if [ $((pass + failed)) -ne "$want" ]; then no "expected $want cases, ran $((pass + failed))"; fi
 
 echo "$pass passed, $failed failed"

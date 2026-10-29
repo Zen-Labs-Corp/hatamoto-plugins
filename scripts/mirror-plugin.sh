@@ -16,6 +16,9 @@
 # and vendor/ touched) and the upstream is not contacted; missing v<version> or main
 # are added. A src/<commit> that fails verification is an error.
 #
+# First-party manifests (tier first-party, repo Zen-Labs-Corp/hatamoto-first-party)
+# are skipped, not mirrored: the monorepo is their source of record.
+#
 # Environment:
 #   MIRROR_ORG    GitHub organization that owns the mirrors (required unless MIRROR_BASE)
 #   GH_TOKEN      token with Administration + Contents write on that org; read once,
@@ -43,6 +46,16 @@ repo=$(field repo)
 commit=$(field commit)
 subdir=$(field subdir)
 subdir=${subdir%/}
+
+# First-party plugins are not mirrored: their source of record is the first-party
+# monorepo. Runs after validation and before any env, token, git or gh handling.
+tier=$(field tier)
+first_party_repo='^https://github\.com/zen-labs-corp/hatamoto-first-party(\.git)?$'
+repo_lc=$(printf '%s' "$repo" | LC_ALL=C tr 'A-Z' 'a-z')  # ASCII-only: no Unicode case folding
+if [ "$tier" = first-party ] && [[ $repo_lc =~ $first_party_repo ]]; then
+  echo "mirror-plugin: $name: skipped: first-party (source of record is Zen-Labs-Corp/hatamoto-first-party)"
+  exit 0
+fi
 
 # Where the mirror lives.
 local_mode=0
