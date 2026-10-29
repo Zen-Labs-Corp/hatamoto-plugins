@@ -1,6 +1,15 @@
 {
   "name": "hanshi",
   "title": "Hanshi",
+  "about": "Hanshi is a blog theme with hairline frames, generated pattern covers, a page ruler for pagination and a post index that follows you down the page. The homepage shows a lead post and a numbered list of the latest posts, with a topic bar and a topics grid.\nInstall it from Theme, then Themes, then Available themes, and activate it. Accent colour, heading font, spacing, corners, colour mode and the homepage masthead are set in the theme settings. Colours and fonts and the Design system follow the theme tokens.\nIt ships only the blog layouts and its stylesheet. Pages, sections and forms come from the built-in theme. The post index needs h2 and h3 headings in the post body, and listing cards show a topic only when a post has a category attribute.",
+  "features": [
+    "Lead post, numbered index and topics grid on the homepage",
+    "Pagination ruler with a go-to-page box and arrow keys",
+    "Post index sidebar with scroll spy and reading progress",
+    "Generated line pattern covers for posts without an image",
+    "Search palette that falls back to a plain search form",
+    "Light and dark modes, works without JavaScript"
+  ],
   "repo": "https://github.com/zenlabscorp/hatamoto-theme-hanshi",
   "commit": "0ede287e299192cddd5d17bd550745b37e409d0e",
   "author": "Zen Labs",

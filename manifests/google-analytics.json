@@ -4,6 +4,15 @@
   "commit": "53f9aff4c6bbabe22236ff62ece7d5a833d35ade",
   "subdir": "plugins/google-analytics",
   "title": "Google Analytics",
+  "about": "Adds the Google tag (GA4) for your measurement ID to every public page, with no theme edits. Enter an ID such as G-ABC123XYZ9 (a GT- tag ID also works) in the plugin's Settings tab and save. Leave it empty to turn the tag off.\nGrant the plugin settings and site scripts under Plugins, then Permissions. Without the site scripts grant the tag is never loaded. To leave your own visits out, open any public page of your site with ga-exclude added after a hash sign, once in each browser you use. That browser then stops sending visits, and the plugin page shows how to count it again.\nLimits: no consent mode or cookie banner, no custom events, ecommerce or user ID, and only G- and GT- IDs. The plugin stores nothing on the server. An enforced Content Security Policy blocks the tag until you allow it.",
+  "features": [
+    "Measurement ID set in the plugin settings, no theme edits",
+    "Accepts G- and GT- IDs, checked before anything loads",
+    "Leave your own visits out, per browser",
+    "Plugin page shows whether the tag is on",
+    "Coexists with the Google Tag Manager plugin",
+    "Nothing stored on the server"
+  ],
   "license": "Apache-2.0",
   "sdk": "^0.8",
   "archive_grant": true,

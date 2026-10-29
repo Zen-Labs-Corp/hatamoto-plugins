@@ -4,6 +4,15 @@
   "commit": "077051fd84adad2277990b25e8a8fdee3c4c6a50",
   "subdir": "plugins/searchconsole",
   "title": "Google Search Console",
+  "about": "Connects your site to Google Search Console from the admin. Pick the property, submit your sitemap, inspect URLs, and keep a daily copy of search performance (queries and pages) in the plugin's own tables.\nSetup: create an OAuth client of type Web application in Google Cloud, enable the Search Console API, and add the redirect address shown in the plugin README. Then enter the client ID, client secret and public address of your site in the plugin settings, grant its permissions, and press Connect to Google on the Search Console page.\nLimits: one property per site, and data older than the import window is not back-filled. Tokens are encrypted, but database backups still hold the key material, so treat them as secret. The sandboxed admin page cannot open windows, so you open the sign-in address yourself.",
+  "features": [
+    "Pick the Search Console property for your site",
+    "Submit your sitemap from the admin",
+    "Inspect the index status of single URLs",
+    "Daily import of queries and pages, hourly job fills missing days",
+    "Sign-in uses OAuth with PKCE, tokens stored encrypted",
+    "Client secret is write-only and never shown again"
+  ],
   "license": "Apache-2.0",
   "sdk": "^0.8",
   "archive_grant": true,
