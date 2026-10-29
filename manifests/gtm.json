@@ -4,6 +4,14 @@
   "commit": "077051fd84adad2277990b25e8a8fdee3c4c6a50",
   "subdir": "plugins/gtm",
   "title": "Google Tag Manager",
+  "about": "Loads your Google Tag Manager container on every public page, with no theme edits. Enter the container ID (for example GTM-ABC1234) in the plugin's Settings tab and save. Cached pages refresh when you save, and an empty ID turns the tag off.\nThe loader script runs only after you grant the plugin site scripts under Plugins, then Permissions. Without that grant the container is never loaded.\nLimits: no noscript fallback, no consent mode, and no server-side Tag Manager domain. If your site enforces a Content Security Policy, the container stays blocked until you allow it. A mistyped but well-formed ID is accepted, because the plugin cannot check that the container exists.",
+  "features": [
+    "Container ID set in the plugin settings, no theme edits",
+    "ID is checked before anything loads",
+    "Never loads the same container twice",
+    "Cached pages refresh when you save",
+    "Leave the ID empty to turn the tag off"
+  ],
   "license": "Apache-2.0",
   "sdk": "^0.8",
   "archive_grant": true,
