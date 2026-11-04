@@ -1,0 +1,20 @@
+{
+  "name": "event-calendar",
+  "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
+  "commit": "f5a35aad3fd95a254992238da512fc9ca7eaf06a",
+  "subdir": "plugins/event-calendar",
+  "title": "Event calendar",
+  "about": "Adds events to your site: upcoming and past event lists for the page builder, a calendar feed visitors can subscribe to, and Event structured data for search engines. Events are ordinary content, so you keep editing them like anything else.\nSetup: you create the event content type yourself, because a plugin cannot ship one. Open the content types editor, add a type with the slug event, switch to its JSON tab and paste the schema from the plugin README. Each event needs a start time, and only published events are used. Then bind a list widget to Upcoming events or Past events.\nThe feed at /p/event-calendar/events.ics lists all upcoming events, and each event has its own .ics file. A template function called when prints the date and time as plain text.\nThe time_zone setting defaults to UTC, so set it to your site's zone, for example Europe/London.\nLimits: no recurring events, no tickets or payments (only a ticket link), and no maps. Lists show at most 48 items, and the feed is cached for 15 minutes.",
+  "features": [
+    "Upcoming and past event lists for the page builder",
+    "Calendar feed of upcoming events at /p/event-calendar/events.ics",
+    "A downloadable .ics file for each event",
+    "Event structured data added to event pages",
+    "A when template function for readable dates and times",
+    "Time zone and date format set in the plugin settings"
+  ],
+  "license": "Apache-2.0",
+  "sdk": "^0.11",
+  "archive_grant": true,
+  "tier": "first-party"
+}
