@@ -1,0 +1,11 @@
+{
+  "name": "reviews",
+  "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
+  "commit": "2079735e33d77d8c8e136d693b5ae79a54d6e230",
+  "subdir": "plugins/reviews",
+  "title": "Google and Trustpilot reviews",
+  "license": "Apache-2.0",
+  "sdk": "^0.11",
+  "archive_grant": true,
+  "tier": "first-party"
+}
