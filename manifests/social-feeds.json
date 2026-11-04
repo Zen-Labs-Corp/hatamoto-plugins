@@ -1,0 +1,20 @@
+{
+  "name": "social-feeds",
+  "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
+  "commit": "acdc0d3739361180af2b57d8427ed04fec485d36",
+  "subdir": "plugins/social-feeds",
+  "title": "Instagram and YouTube feeds",
+  "license": "Apache-2.0",
+  "sdk": "^0.11",
+  "archive_grant": true,
+  "tier": "first-party",
+  "about": "Shows your latest Instagram posts and YouTube videos on your pages through two page-builder data sources, Instagram posts and YouTube videos. Each item carries the caption or title, the link, the date and the thumbnail as its image.\nThe plugin keeps its own copy of the latest 50 items per source and refreshes it every 3 hours, so a page never waits on Instagram or YouTube. Instagram media addresses expire, and each refresh replaces them.\nConnect an Instagram business or creator account with your Meta app ID and secret and the site address in Settings, then Connect Instagram on the plugin page. For YouTube, add an API key with the YouTube Data API enabled and the channel ID. The long-lived Instagram token is renewed automatically. Disconnect deletes the token and the cached posts.\nLimits: personal Instagram accounts are not supported by the Instagram API. The admin preview shows text only; thumbnails appear on your site.",
+  "features": [
+    "Instagram posts and YouTube videos as page-builder data sources",
+    "Thumbnail, caption or title, link and date for every item",
+    "Cached copy refreshed every 3 hours, latest 50 items per source",
+    "Instagram connect with automatic long-lived token renewal",
+    "YouTube uploads from a channel ID and an API key",
+    "Refresh now and Disconnect from the plugin page"
+  ]
+}
