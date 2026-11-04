@@ -1,0 +1,11 @@
+{
+  "name": "link-checker",
+  "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
+  "commit": "4652302103e0bff4176afeb4e87c9e083ef8fc4e",
+  "subdir": "plugins/link-checker",
+  "title": "Broken link checker",
+  "license": "Apache-2.0",
+  "sdk": "^0.11",
+  "archive_grant": true,
+  "tier": "first-party"
+}
