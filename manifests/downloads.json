@@ -1,0 +1,20 @@
+{
+  "name": "downloads",
+  "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
+  "commit": "acdc0d3739361180af2b57d8427ed04fec485d36",
+  "subdir": "plugins/downloads",
+  "title": "Download counter",
+  "about": "Counts downloads of files in your media library. Link to /p/downloads/f/ followed by the file id: each click is counted for the day and the visitor is sent on to the file. The plugin's Settings tab shows every file with its total, the last 30 days and a trend line, with a button to copy its tracked link.\nThe page builder gets a Downloadable files source with each file's name, size and count, and themes can print a count with plugin_downloads_count.\nLimits: crawlers and link previewers are not counted unless you turn on Count bots; repeat clicks by the same visitor all count; files served from an absolute or CDN address are not redirected to. Daily counts are kept for 13 months, then folded into monthly totals.",
+  "features": [
+    "Tracked download links for any media library file",
+    "Daily counts per file, monthly totals after 13 months",
+    "Admin table with totals, last 30 days and a trend line",
+    "Page builder source listing files with size and count",
+    "Template function that prints a file's count",
+    "Crawlers are not counted unless you turn it on"
+  ],
+  "license": "Apache-2.0",
+  "sdk": "^0.11",
+  "archive_grant": true,
+  "tier": "first-party"
+}
