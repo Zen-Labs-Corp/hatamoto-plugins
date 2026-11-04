@@ -1,0 +1,22 @@
+{
+  "name": "popups",
+  "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
+  "commit": "acdc0d3739361180af2b57d8427ed04fec485d36",
+  "subdir": "plugins/popups",
+  "title": "Popups and announcement bars",
+  "about": "Adds announcement bars and popups to your public pages, with no theme edits. Open the plugin's Settings tab and add up to 10 campaigns. Each one can target pages with include and exclude paths, run between a start and an end date (always UTC), and use a frequency cap so a visitor who closes it sees it again only after a set time. Save, and cached pages are refreshed.\nA popup is a native dialog with a visible close button, and it closes with Esc. A bar can be dismissed too. Pages stay cached: the browser checks dates, paths and frequency again, so a cached page never shows an ended or not yet started campaign.\nGrant the plugin settings and site scripts under Plugins, then Permissions. Without the site scripts grant nothing shows. The plugin keeps no data on the server. The visitor's browser remembers dismissals.\nLimits: no forms inside popups, no A/B tests and no analytics.",
+  "features": [
+    "Up to 10 bars or popups",
+    "Page targeting with include and exclude paths",
+    "Start and end dates, in UTC",
+    "Frequency caps for returning visitors",
+    "Popup is a native dialog, closes with Esc or the close button",
+    "Bars can be dismissed",
+    "Pages stay cached",
+    "No data kept on the server"
+  ],
+  "license": "Apache-2.0",
+  "sdk": "^0.8",
+  "archive_grant": true,
+  "tier": "first-party"
+}
