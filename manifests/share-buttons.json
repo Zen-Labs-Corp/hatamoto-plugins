@@ -1,0 +1,20 @@
+{
+  "name": "share-buttons",
+  "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
+  "commit": "73cd88639f73f8a6e849eb120cb21fa3554dd8ac",
+  "subdir": "plugins/share-buttons",
+  "title": "Share buttons",
+  "about": "Adds share links for LinkedIn, X, Facebook, WhatsApp, Bluesky and email to posts and pages, as a theme partial and a share_buttons section. The links are plain links: no JavaScript, no tracking and no share counts.\nIn the plugin's Settings tab, set Networks as a comma-separated list of ids in display order, for example bluesky, x, email. Choose a Style: icons, labels or both. Set Site URL to your public origin (scheme and no path), because the section needs it. In a post or page template, add {{template \"plugin/share_buttons/links\" .}}. Grant the plugin settings under Plugins, then Permissions.\nLimits: no share counts, no Web Share API and no follow buttons. The theme must call the partial, and the default theme does not. Labels are English only.",
+  "features": [
+    "Share links for LinkedIn, X, Facebook, WhatsApp, Bluesky and email",
+    "Theme partial and a share_buttons section",
+    "Plain links, no JavaScript, no tracking, no share counts",
+    "Choose the networks and their order in Settings",
+    "Style: icons, labels or both",
+    "Needs only the settings grant, stores no data"
+  ],
+  "license": "Apache-2.0",
+  "sdk": "^0.8",
+  "archive_grant": true,
+  "tier": "first-party"
+}
