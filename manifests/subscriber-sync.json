@@ -1,0 +1,20 @@
+{
+  "name": "subscriber-sync",
+  "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
+  "commit": "f5a35aad3fd95a254992238da512fc9ca7eaf06a",
+  "subdir": "plugins/subscriber-sync",
+  "title": "Subscriber sync for email marketing",
+  "about": "Adds people who submit your forms to a Mailchimp, Brevo, MailerLite or Kit list. Choose the provider in the plugin's Settings tab, paste the API key, set the list (Mailchimp audience ID, Brevo list ID, MailerLite group ID or Kit form ID) and enter the slugs of the forms to sync, one per line. Map the email field and, if you want them, the first name, last name and consent field. Then press Test connection to see the list name it found.\nA submission adds the person to the list or updates them if already there. With a consent field set, only ticked submissions are sent and the others are logged as skipped. Failed deliveries are retried in the background.\nPermissions: read form submissions, read your saved settings, call only the provider API hosts to deliver subscribers, keep a queue and a log in the plugin's own tables, and write failure counts to the host log.\nData kept: a pending delivery holds the email address and names for at most 24 hours. The log keeps time, form, status and reason for 30 days, without email addresses.\nLimits: one provider and one list at a time, and nothing is synced back. Double opt in is available only for Mailchimp and Kit, as a form setting. Tags work only with Mailchimp and Kit.",
+  "features": [
+    "Works with Mailchimp, Brevo, MailerLite and Kit",
+    "Maps email, first name, last name and an optional consent field",
+    "Only sends submissions with the consent field ticked",
+    "Retries failed deliveries for up to 24 hours",
+    "Test connection button shows the list it found",
+    "Delivery log kept 30 days, without email addresses"
+  ],
+  "license": "Apache-2.0",
+  "sdk": "^0.8",
+  "archive_grant": true,
+  "tier": "first-party"
+}
