@@ -1,0 +1,20 @@
+{
+  "name": "feed-reader",
+  "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
+  "commit": "1e7f49273ae35bb4dfd907ae6b0cda401ccd03a6",
+  "subdir": "plugins/feed-reader",
+  "title": "RSS and Atom feed reader",
+  "about": "Pulls the latest items from up to 20 RSS or Atom feeds you choose and offers them to the page builder as a data source. Add each feed with a name and its address in the plugin settings. Feeds are checked every 30 minutes, using conditional requests so unchanged feeds cost almost nothing.\nIn the page builder, pick Feed items as the source of a query loop to list the newest items from every feed, or give feeds a group number from 1 to 7 and pick that group. Every item links back to the original article and shows a short text excerpt, never the feed HTML.\nThe plugin page shows each feed with its last fetch, status and item count, the latest items, and a Fetch now button. A broken feed never stops the others.\nLimits: at most 20 feeds, 1 MiB per feed, the newest 200 items per feed for up to 90 days, ports 80 and 443 only. Items are not imported as posts.",
+  "features": [
+    "RSS 2.0, RSS 1.0 and Atom feeds",
+    "Up to 20 feeds, refreshed every 30 minutes",
+    "Conditional requests with ETag and Last-Modified",
+    "Page-builder source for all feeds or one of 7 groups",
+    "Text-only excerpts that link back to each source",
+    "One broken feed never stops the others"
+  ],
+  "license": "Apache-2.0",
+  "sdk": "^0.11",
+  "archive_grant": true,
+  "tier": "first-party"
+}
