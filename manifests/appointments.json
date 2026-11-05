@@ -1,0 +1,20 @@
+{
+  "name": "appointments",
+  "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
+  "commit": "96e9d46eeb9f503b4b88f7a064b337b39ad7a66b",
+  "subdir": "plugins/appointments",
+  "title": "Appointments with Cal.com or Calendly",
+  "about": "Adds an appointments section that embeds your own Cal.com or Calendly scheduling page in an iframe, with a plain link underneath for visitors whose browser blocks the frame. Bookings happen on Cal.com or Calendly, not on your site. It also provides two button partials: plugin/appointments/button and plugin/appointments/button_site, which falls back to the booking URL of your business profile.\nIn the plugin's Settings tab, choose the provider, enter your scheduling link (https on cal.com or calendly.com), set the button label and the frame height. Grant the plugin settings and site.scripts under Plugins, then Permissions. site.scripts is needed only because the section contains an iframe: the plugin runs no JavaScript of its own, and frames load only from cal.com and calendly.com. The plugin stores no data. It needs Hatamoto v1.0.8 or later (SDK 0.18).\nLimits: no native booking, availability or payments. The fallback text is English only. The theme must call a button partial, and the default theme does not.",
+  "features": [
+    "Embeds your Cal.com or Calendly scheduling page in an iframe",
+    "Plain link fallback if the frame does not load",
+    "Button partials for a theme, with a business profile booking URL fallback",
+    "Settings for provider, link, button label and frame height",
+    "Frames load only from cal.com and calendly.com",
+    "Runs no JavaScript of its own, stores no data"
+  ],
+  "license": "Apache-2.0",
+  "sdk": "^0.18",
+  "archive_grant": true,
+  "tier": "first-party"
+}
