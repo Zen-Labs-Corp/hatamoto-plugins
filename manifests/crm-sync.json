@@ -1,0 +1,22 @@
+{
+  "name": "crm-sync",
+  "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
+  "commit": "93a88af7a5849667c68376bb92c7181d391157fe",
+  "subdir": "plugins/crm-sync",
+  "title": "HubSpot, Pipedrive and Salesforce sync",
+  "about": "Sends people who submit your forms to HubSpot, Pipedrive or Salesforce as contacts or leads. Choose the provider in the plugin's Settings tab and enter its credentials, then enter the slugs of the forms to sync, one per line. Set the email field and, if you want them, a consent field and a note. Press Test connection on the plugin page, then map each form field to a CRM field from the CRM's own dropdowns.\nA submission never slows your form. Within about a minute the person is created in the CRM, or updated if the same email is already there, so nobody is duplicated. With a consent field set, only ticked submissions are sent and the others are logged as skipped. With Add a note on, a note holds the form name, the page, the time and every submitted field. Failures that may pass are retried in the background for up to 24 hours.\nPermissions: read form submissions, read your saved settings, call only the CRM API hosts to deliver people, keep a queue and a log in the plugin's own tables, keep the Salesforce token and your field mapping in its key-value store, and write failure counts to the host log.\nData kept: a pending delivery holds the email address and the submitted field values for at most 24 hours. The log keeps time, form, status and a short message for 30 days, without email addresses or form values.\nLimits: one CRM at a time and nothing is synced back. No deals, pipelines or opportunities.",
+  "features": [
+    "Works with HubSpot, Pipedrive and Salesforce",
+    "Updates a person by email, so nobody is duplicated",
+    "Maps form fields to CRM fields on the plugin page",
+    "Only sends submissions with the consent field ticked",
+    "Adds a note with the message and every submitted field",
+    "Retries failed deliveries for up to 24 hours",
+    "Test connection button checks your credentials",
+    "Delivery log kept 30 days, without form values"
+  ],
+  "license": "Apache-2.0",
+  "sdk": "^0.8",
+  "archive_grant": true,
+  "tier": "first-party"
+}
