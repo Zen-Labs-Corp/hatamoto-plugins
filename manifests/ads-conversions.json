@@ -1,0 +1,21 @@
+{
+  "name": "ads-conversions",
+  "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
+  "commit": "93a88af7a5849667c68376bb92c7181d391157fe",
+  "subdir": "plugins/ads-conversions",
+  "title": "Google, TikTok and LinkedIn conversions",
+  "about": "Sends a server-side conversion to Google Ads, TikTok and LinkedIn for each form submission, as a backup for the browser tags. Each conversion carries a SHA-256 hashed email, a hashed phone number (not for LinkedIn) and the ad click ID when the visitor's browser posted one. The submission id is the deduplication key, so a platform counts a lead once when your browser tag reports it too.\nOpen the plugin's Settings tab, enter your site address, choose which forms to send and fill in the sections of the platforms you use. Grant forms, settings, web requests, database, storage, mail, site scripts and log under Plugins, then Permissions. For Google and LinkedIn, enter the OAuth client details, register the redirect address shown in the README, then press Connect. For TikTok, paste the pixel code and the Events API access token. Use Test on each card to check a platform without sending a real conversion.\nLimits: plugins never receive the visitor's IP address or browser details, so matching relies on hashed contact details and click IDs. Click IDs need the page script and marketing consent. Names are not sent. Conversions go out one to two minutes after the submission, and a failed one is retried for up to 24 hours. LinkedIn tokens last 60 days and may need reconnecting. Submissions from before setup are not backfilled.",
+  "features": [
+    "Server-side conversion to Google Ads, TikTok and LinkedIn for every form submission",
+    "Submission id used as the deduplication key, so browser and server events count once",
+    "Email and phone normalised and SHA-256 hashed, no raw contact details kept",
+    "Ad click IDs kept in a first-party cookie after marketing consent",
+    "Per-form selection, field mapping and an optional consent field",
+    "Connect for Google and LinkedIn, and a Test button for each platform",
+    "Delivery log with platform codes and messages, kept 30 days"
+  ],
+  "license": "Apache-2.0",
+  "sdk": "^0.8",
+  "archive_grant": true,
+  "tier": "first-party"
+}
