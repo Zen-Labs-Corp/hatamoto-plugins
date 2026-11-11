@@ -11,8 +11,8 @@ packages to this repository are no longer accepted.
 Each file in `manifests/` pins one first-party plugin to an exact commit, with
 `tier: first-party`. First-party plugins live in folders of
 [`Zen-Labs-Corp/hatamoto-first-party`](https://github.com/Zen-Labs-Corp/hatamoto-first-party)
-(`subdir`). Each file in `manifests/themes/` pins one first-party theme, from a git
-repo owned by `Zen-Labs-Corp`. The validators here refuse anything else.
+(`subdir`). Each file in `manifests/themes/` pins one first-party theme, from a
+github.com repo owned by `Zen-Labs-Corp` or `zenlabscorp`. The validators here refuse anything else.
 
 The Hatamoto team builds each listed package from its pinned commit, signs it with
 the Hatamoto key and publishes it. Listed plugins and themes appear on

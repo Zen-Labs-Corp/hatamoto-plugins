@@ -18,7 +18,7 @@ The full theme reference (layouts, template funcs, sections, markers) is
 
 - The `hatamoto` binary, for `theme check` and `theme pack` (and `theme dev`,
   which also needs a running development server, see below).
-- A public git repo for your theme, or a place to host a zip over https.
+- A GitHub account, to attach your signed theme package to a release.
 
 ## 1. Lay out the files
 
@@ -124,13 +124,7 @@ passes here it passes there.
 
 `theme check` does not render your templates; step 4 does. Run both.
 
-If you will publish a zip instead of a git repo, check the zip too:
-
-```sh
-hatamoto theme check --archive theme.zip --sha256 "$(sha256sum theme.zip | cut -d' ' -f1)" --registry
-```
-
-Add `--expect-name kumo` to either form to fail when `theme.json` names a
+Add `--expect-name kumo` to fail when `theme.json` names a
 different theme.
 
 ## 6. Pack and try it as a package
@@ -148,7 +142,8 @@ first-party themes listed in this repository are signed with the registry key. T
 
 ## 7. Publish
 
-Push your theme to a public git host (or build the zip and its sha256) and publish it
-from your developer account at <https://hatamoto.dev/developers>. The steps are in
+Pack the theme with your own key (step 6), attach the signed `.hmp` to a GitHub
+release, and submit that release link from your developer account at
+<https://hatamoto.dev/developers>. Other hosts are refused. The steps are in
 [Part 2 of the theme guide](https://github.com/Zen-Labs-Corp/hatamoto/blob/main/docs/THEMES_WRITE_AND_SUBMIT.md#part-2-publish-your-theme).
 This repository does not take manifests from outside authors.

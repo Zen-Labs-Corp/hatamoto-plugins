@@ -13,7 +13,7 @@ validator in this repository refuses such a manifest. To write a theme first, re
 
 ## How a listing works
 
-1. The theme lives in a git repo owned by `Zen-Labs-Corp` (today
+1. The theme lives in a github.com repo owned by `Zen-Labs-Corp` or `zenlabscorp` (today
    `Zen-Labs-Corp/hatamoto-themes`, one folder per theme).
 2. A maintainer adds one small manifest in `manifests/themes/` that pins a commit.
 3. CI checks the manifest and a maintainer reviews the theme at that pin.
