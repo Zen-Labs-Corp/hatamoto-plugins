@@ -1,40 +1,30 @@
 # Hatamoto plugins
 
-The community plugin registry for [Hatamoto](https://hatamoto.dev). Each file in
-`manifests/` pins one plugin, hosted in its author's own GitHub repo, to an exact
-commit. First-party plugins (`gtm`, `searchconsole`) are listed the same way, from
-folders of [`Zen-Labs-Corp/hatamoto-first-party`](https://github.com/Zen-Labs-Corp/hatamoto-first-party) (`subdir`), with `tier: first-party` instead of an author. A merged manifest means the plugin is approved: the Hatamoto team builds
-it from that commit, signs it with the Hatamoto key and publishes it. At merge a
-copy of the pinned source is also archived in a repo the project owns, so removing
-the author's repo does not remove an approved plugin. The copy is the source at
-the pinned commit; vendored dependencies are a last resort added only when the SDK
-is public, and an existing mirror is never re-vendored.
+The list of first-party Hatamoto plugins and themes, built and signed by the Hatamoto team.
 
-Approved plugins are listed on <https://hatamoto.dev/plugins> and install with one
-click from Admin > Plugins > Browse registry.
+Want to publish your own plugin or theme? Create a free developer account at
+https://hatamoto.dev/developers and submit there. Pull requests adding outside
+packages to this repository are no longer accepted.
 
-## Themes
+## What is listed
 
-Themes are submitted the same way, as `manifests/themes/<name>.json`, and are
-reviewed, repacked, signed and archived by the Hatamoto team. They are not
-mirrored and need no SDK. Approved themes are listed on
-<https://hatamoto.dev/themes>.
+Each file in `manifests/` pins one first-party plugin to an exact commit, with
+`tier: first-party`. First-party plugins live in folders of
+[`Zen-Labs-Corp/hatamoto-first-party`](https://github.com/Zen-Labs-Corp/hatamoto-first-party)
+(`subdir`). Each file in `manifests/themes/` pins one first-party theme, from a git
+repo owned by `Zen-Labs-Corp`. The validators here refuse anything else.
 
-- [WRITING-THEMES.md](WRITING-THEMES.md): write a theme.
-- [CONTRIBUTING-THEMES.md](CONTRIBUTING-THEMES.md): submit, update or remove one.
-- [manifests/themes/README.md](manifests/themes/README.md) and [schemas/theme-manifest.schema.json](schemas/theme-manifest.schema.json): the theme manifest format.
-- Open a theme pull request with the theme template:
-  `https://github.com/Zen-Labs-Corp/hatamoto-plugins/compare/main...your-branch?template=theme.md`
-
-> **Status:** the Hatamoto SDK (`hatamoto.dev/sdk`) is public at
-> <https://github.com/Zen-Labs-Corp/hatamoto-sdk>, so plugins build outside the core
-> repository today. Community submissions, for plugins and themes, open when Hatamoto core goes public.
+The Hatamoto team builds each listed package from its pinned commit, signs it with
+the Hatamoto key and publishes it. Listed plugins and themes appear on
+<https://hatamoto.dev/plugins> and <https://hatamoto.dev/themes> and install with one
+click from the Hatamoto admin.
 
 ## Guides
 
-- [WRITING.md](WRITING.md): write a plugin in your own GitHub repo, from zero.
-- [CONTRIBUTING.md](CONTRIBUTING.md): submit it for approval, update it, remove it.
-- [manifests/README.md](manifests/README.md) and [manifests/schema.json](manifests/schema.json): the manifest format.
+- [WRITING.md](WRITING.md) and [WRITING-THEMES.md](WRITING-THEMES.md): write a plugin or a theme.
+- [CONTRIBUTING.md](CONTRIBUTING.md) and [CONTRIBUTING-THEMES.md](CONTRIBUTING-THEMES.md): how maintainers add, update and remove a first-party listing.
+- [manifests/README.md](manifests/README.md) and [manifests/schema.json](manifests/schema.json): the plugin manifest format.
+- [manifests/themes/README.md](manifests/themes/README.md) and [schemas/theme-manifest.schema.json](schemas/theme-manifest.schema.json): the theme manifest format.
 
 ## Checks
 
@@ -45,14 +35,15 @@ manifest with the base rules. The Hatamoto registry build for plugins (`registry
 in the Hatamoto core repository) reads `policy/` from a checkout of this repository; a missing,
 unreadable or empty list stops the build, so a bad policy change breaks publishing, not just PR
 checks. The theme build still uses its own reserved list and will read `reserved-names.txt` in a
-follow-up.
+follow-up. The registry build is looser than the validators here: it still accepts a plugin
+manifest without a tier and does not check the owner of a theme.
 Run the same checks locally:
 
 ```sh
 bash tests/run.sh                         # validator self-test (includes run-themes.sh)
 bash tests/run-themes.sh                  # theme validator self-test only
-scripts/validate-manifest.sh manifests/acme-seo.json --remote
-scripts/validate-theme-manifest.sh manifests/themes/acme-dark.json --remote
+scripts/validate-manifest.sh manifests/gtm.json --remote
+scripts/validate-theme-manifest.sh manifests/themes/hanshi.json --remote
 ```
 
 ## Maintainer setup for the mirror
