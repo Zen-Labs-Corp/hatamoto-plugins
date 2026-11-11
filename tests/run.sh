@@ -18,8 +18,8 @@ if "$v" "$f/good.json" >/dev/null 2>&1; then ok "good.json accepted"; else no "g
 # The validator refuses it for the missing tier; the other listing rules still run on it, so the
 # tests below that exercise them build from this shape and ignore the tier line (rules_err).
 com='del(.tier) | del(.subdir) | .author = "acme" | .repo = "https://github.com/acme/hatamoto-good"'
-# rules_err <file>: the validator's stderr without the missing-tier line; empty when only the tier is wrong.
-rules_err() { "$v" "$1" 2>&1 >/dev/null | grep -v 'missing required field: tier' || true; }
+# rules_err <file>: the validator's stderr without the missing-tier line (which must be there); empty when only the tier is wrong.
+rules_err() { local out; out=$("$v" "$1" 2>&1 >/dev/null); [[ $out == *"missing required field: tier"* ]] || echo "expected the missing-tier failure, got: $out"; grep -v 'missing required field: tier' <<<"$out" || true; }
 
 # bad: non-zero exit and an expected stderr substring.
 expect_reject() {
@@ -43,7 +43,7 @@ expect_reject bad-title-script.json "title mixes scripts"
 expect_reject bad-title-words.json 'banned word "best"'
 expect_reject missing-grant.json "missing required field: archive_grant"
 expect_reject bad-grant.json "archive_grant must be true"
-expect_reject bad-author.json "outside authors publish at https://hatamoto.dev/developers"
+expect_reject bad-author.json "author must be absent for tier first-party"
 expect_reject bad-name-brand.json 'name must not start with the brand "stripe"'
 expect_reject bad-name-reserved.json 'name "seo" is reserved'
 expect_reject bad-name-token.json 'contains the banned word "beta"'

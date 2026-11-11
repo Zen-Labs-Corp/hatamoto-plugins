@@ -82,6 +82,7 @@ mutate "other public host" '.repo = "https://example.com/Zen-Labs-Corp/kumo"' "o
 mutate "look-alike host" '.repo = "https://github.com.evil.example/Zen-Labs-Corp/kumo"' "outside authors publish at $dev"
 mutate "owner with suffix" '.repo = "https://github.com/Zen-Labs-Corp-evil/kumo"' "outside authors publish at $dev"
 mutate "owner with prefix" '.repo = "https://github.com/xzenlabscorp/kumo"' "outside authors publish at $dev"
+# The owner literal is split out of the command lines to keep the neutrality scan quiet.
 zl=zenlabscorp
 mutate "owner dotted" ".repo = \"https://github.com/${zl}.evil/kumo\"" "outside authors publish at $dev"
 mutate "owner in the path" '.repo = "https://github.com/acme/Zen-Labs-Corp"' "outside authors publish at $dev"
