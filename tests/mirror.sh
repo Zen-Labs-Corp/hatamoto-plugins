@@ -35,18 +35,19 @@ upstream() {
   gi -C "$1" add -A
   gi -C "$1" commit -qm init
 }
-# The validator also requires author == repo owner, so the author is the parent dir "up".
+# The validator only lists first-party plugins: tier first-party, no author, and the owner (the parent
+# dir of a file:// repo) is "zenlabscorp".
 # manifest <name> <repo-dir> <commit> [jq filter]: manifests/<name>.json from good.json.
 manifest() {
   mkdir -p "$tmp/manifests"
-  jq --arg n "$1" --arg r "file://$2" --arg c "$3" '.name = $n | .repo = $r | .commit = $c | .author = "up"' \
+  jq --arg n "$1" --arg r "file://$2" --arg c "$3" '.name = $n | .repo = $r | .commit = $c | del(.subdir)' \
     "tests/fixtures/good.json" | jq "${4:-.}" >"$tmp/manifests/$1.json"
 }
 
 # --- basic mirror ---------------------------------------------------------
-upstream "$tmp/up/amber" amber 1.2.3
-sha=$(git -C "$tmp/up/amber" rev-parse HEAD)
-manifest amber "$tmp/up/amber" "$sha"
+upstream "$tmp/zenlabscorp/amber" amber 1.2.3
+sha=$(git -C "$tmp/zenlabscorp/amber" rev-parse HEAD)
+manifest amber "$tmp/zenlabscorp/amber" "$sha"
 mir=$tmp/mirrors/amber
 out=$(GH_TOKEN=sekret-token-value "$m" "$tmp/manifests/amber.json" 2>&1)
 if [ $? -eq 0 ]; then ok "mirrors a plugin"; else no "mirrors a plugin: $out"; fi
@@ -55,7 +56,7 @@ case "$out" in *sekret-token-value*) no "token leaked into output" ;; *) ok "no 
 [ "$(git -C "$mir" cat-file -t "src/$sha")" = tag ] && ok "src/<commit> is an annotated tag" || no "src tag annotated"
 [ "$(git -C "$mir" cat-file -t v1.2.3)" = tag ] && ok "v<version> is an annotated tag" || no "version tag annotated"
 [ "$(git -C "$mir" rev-parse "src/$sha^{commit}")" = "$(git -C "$mir" rev-parse v1.2.3^{commit})" ] && ok "both tags name the mirror commit" || no "tags differ"
-if git -C "$mir" show "src/$sha^{commit}:MIRROR.json" | jq -e --arg c "$sha" --arg r "file://$tmp/up/amber" \
+if git -C "$mir" show "src/$sha^{commit}:MIRROR.json" | jq -e --arg c "$sha" --arg r "file://$tmp/zenlabscorp/amber" \
   '.name == "amber" and .version == "1.2.3" and .upstream == $r and .commit == $c and .vendored == false and (.mirrored_at | length > 0)' >/dev/null; then
   ok "MIRROR.json fields, vendored false without SDK_PUBLIC"; else no "MIRROR.json fields"; fi
 [ "$(git -C "$mir" diff --name-only "$sha" "src/$sha^{commit}")" = MIRROR.json ] && ok "mirror commit adds only MIRROR.json when unvendored" || no "mirror commit paths"
@@ -67,10 +68,10 @@ if "$m" "$tmp/manifests/amber.json" >/dev/null 2>&1; then ok "re-run on identica
 [ "$before" = "$(git -C "$mir" for-each-ref --format='%(refname) %(objectname)')" ] && ok "re-run changes no ref" || no "re-run changes refs"
 
 # --- differing content under an existing src tag --------------------------
-upstream "$tmp/up/birch" birch 2.0.0
-bsha=$(git -C "$tmp/up/birch" rev-parse HEAD)
-manifest birch "$tmp/up/birch" "$bsha"
-git clone -q "$tmp/up/birch" "$tmp/seed"
+upstream "$tmp/zenlabscorp/birch" birch 2.0.0
+bsha=$(git -C "$tmp/zenlabscorp/birch" rev-parse HEAD)
+manifest birch "$tmp/zenlabscorp/birch" "$bsha"
+git clone -q "$tmp/zenlabscorp/birch" "$tmp/seed"
 echo x >"$tmp/seed/extra.txt"
 gi -C "$tmp/seed" add -A
 gi -C "$tmp/seed" commit -qm other
@@ -85,25 +86,25 @@ else no "differing content: $err"; fi
 [ -z "$(git -C "$tmp/mirrors/birch" tag -l 'v*')" ] && ok "nothing else pushed after the refusal" || no "extra tags pushed"
 
 # --- v<version> already present elsewhere is kept -------------------------
-upstream "$tmp/up/gamma" gamma 3.0.0
-gsha=$(git -C "$tmp/up/gamma" rev-parse HEAD)
-manifest gamma "$tmp/up/gamma" "$gsha"
+upstream "$tmp/zenlabscorp/gamma" gamma 3.0.0
+gsha=$(git -C "$tmp/zenlabscorp/gamma" rev-parse HEAD)
+manifest gamma "$tmp/zenlabscorp/gamma" "$gsha"
 git init -q --bare "$tmp/mirrors/gamma"
-git -C "$tmp/up/gamma" push -q "$tmp/mirrors/gamma" "HEAD:refs/heads/old"
-git -C "$tmp/up/gamma" tag v3.0.0
-git -C "$tmp/up/gamma" push -q "$tmp/mirrors/gamma" refs/tags/v3.0.0
+git -C "$tmp/zenlabscorp/gamma" push -q "$tmp/mirrors/gamma" "HEAD:refs/heads/old"
+git -C "$tmp/zenlabscorp/gamma" tag v3.0.0
+git -C "$tmp/zenlabscorp/gamma" push -q "$tmp/mirrors/gamma" refs/tags/v3.0.0
 if "$m" "$tmp/manifests/gamma.json" >/dev/null 2>&1 \
   && [ "$(git -C "$tmp/mirrors/gamma" rev-parse v3.0.0)" = "$gsha" ] \
   && git -C "$tmp/mirrors/gamma" rev-parse -q --verify "refs/tags/src/$gsha" >/dev/null; then
   ok "existing v<version> tag kept, src tag added"; else no "existing v<version> tag"; fi
 
 # --- missing grant, bad license -------------------------------------------
-manifest delta "$tmp/up/amber" "$sha" 'del(.archive_grant)'
+manifest delta "$tmp/zenlabscorp/amber" "$sha" 'del(.archive_grant)'
 if "$m" "$tmp/manifests/delta.json" >/dev/null 2>&1; then no "missing grant refused"; else ok "missing grant refused"; fi
 [ ! -e "$tmp/mirrors/delta" ] && ok "no mirror created for a refused manifest" || no "mirror created for a refused manifest"
 
 # --- plugin.json name mismatch --------------------------------------------
-manifest epsilon "$tmp/up/amber" "$sha"
+manifest epsilon "$tmp/zenlabscorp/amber" "$sha"
 if "$m" "$tmp/manifests/epsilon.json" >/dev/null 2>&1; then no "name mismatch refused"; else ok "name mismatch refused"; fi
 
 # --- vendoring (SDK_PUBLIC=true) ------------------------------------------
@@ -116,14 +117,14 @@ printf 'package dep\n\nfunc Hi() string { return "hi" }\n' >"$tmp/depsrc/example
 cp "$tmp/depsrc/example.com/dep@v1.0.0/go.mod" "$dep/v1.0.0.mod"
 echo '{"Version":"v1.0.0","Time":"2024-01-01T00:00:00Z"}' >"$dep/v1.0.0.info"
 echo v1.0.0 >"$dep/list"
-upstream "$tmp/up/zeta" zeta 0.1.0
-printf 'package main\n\nimport "example.com/dep"\n\nfunc main() { _ = dep.Hi() }\n' >"$tmp/up/zeta/main.go"
-printf 'module example.com/zeta\n\ngo 1.22\n\nrequire example.com/dep v1.0.0\n' >"$tmp/up/zeta/go.mod"
-(cd "$tmp/up/zeta" && go mod tidy >/dev/null 2>&1)
-gi -C "$tmp/up/zeta" add -A
-gi -C "$tmp/up/zeta" commit -qm dep
-zsha=$(git -C "$tmp/up/zeta" rev-parse HEAD)
-manifest zeta "$tmp/up/zeta" "$zsha"
+upstream "$tmp/zenlabscorp/zeta" zeta 0.1.0
+printf 'package main\n\nimport "example.com/dep"\n\nfunc main() { _ = dep.Hi() }\n' >"$tmp/zenlabscorp/zeta/main.go"
+printf 'module example.com/zeta\n\ngo 1.22\n\nrequire example.com/dep v1.0.0\n' >"$tmp/zenlabscorp/zeta/go.mod"
+(cd "$tmp/zenlabscorp/zeta" && go mod tidy >/dev/null 2>&1)
+gi -C "$tmp/zenlabscorp/zeta" add -A
+gi -C "$tmp/zenlabscorp/zeta" commit -qm dep
+zsha=$(git -C "$tmp/zenlabscorp/zeta" rev-parse HEAD)
+manifest zeta "$tmp/zenlabscorp/zeta" "$zsha"
 if out=$(SDK_PUBLIC=true "$m" "$tmp/manifests/zeta.json" 2>&1); then
   zm=$tmp/mirrors/zeta
   top=$(git -C "$zm" rev-parse "src/$zsha^{commit}")
@@ -135,12 +136,12 @@ else
 fi
 
 # --- re-run after the upstream is deleted, and completing missing refs ----
-upstream "$tmp/up/kappa" kappa 1.0.0
-ksha=$(git -C "$tmp/up/kappa" rev-parse HEAD)
-manifest kappa "$tmp/up/kappa" "$ksha"
+upstream "$tmp/zenlabscorp/kappa" kappa 1.0.0
+ksha=$(git -C "$tmp/zenlabscorp/kappa" rev-parse HEAD)
+manifest kappa "$tmp/zenlabscorp/kappa" "$ksha"
 "$m" "$tmp/manifests/kappa.json" >/dev/null 2>&1
 km=$tmp/mirrors/kappa
-rm -rf "$tmp/up/kappa"
+rm -rf "$tmp/zenlabscorp/kappa"
 kbefore=$(git -C "$km" for-each-ref --format='%(refname) %(objectname)')
 if "$m" "$tmp/manifests/kappa.json" >/dev/null 2>&1; then ok "re-run succeeds from the mirror after the upstream is deleted"; else no "re-run after upstream deleted"; fi
 [ "$kbefore" = "$(git -C "$km" for-each-ref --format='%(refname) %(objectname)')" ] && ok "no ref changed on that re-run" || no "refs changed after upstream deleted"
@@ -154,11 +155,11 @@ if "$m" "$tmp/manifests/kappa.json" >/dev/null 2>&1 \
 [ "$srctag" = "$(git -C "$km" rev-parse "src/$ksha")" ] && ok "src tag untouched while completing refs" || no "src tag moved"
 
 # --- an existing main is never moved --------------------------------------
-upstream "$tmp/up/lambda" lambda 1.0.0
-lsha=$(git -C "$tmp/up/lambda" rev-parse HEAD)
-manifest lambda "$tmp/up/lambda" "$lsha"
+upstream "$tmp/zenlabscorp/lambda" lambda 1.0.0
+lsha=$(git -C "$tmp/zenlabscorp/lambda" rev-parse HEAD)
+manifest lambda "$tmp/zenlabscorp/lambda" "$lsha"
 git init -q --bare "$tmp/mirrors/lambda"
-git clone -q "$tmp/up/lambda" "$tmp/lseed"
+git clone -q "$tmp/zenlabscorp/lambda" "$tmp/lseed"
 echo x >"$tmp/lseed/other.txt"; gi -C "$tmp/lseed" add -A; gi -C "$tmp/lseed" commit -qm unrelated
 git -C "$tmp/lseed" push -q "$tmp/mirrors/lambda" HEAD:refs/heads/main
 lmain=$(git -C "$tmp/mirrors/lambda" rev-parse main)
@@ -167,9 +168,9 @@ if "$m" "$tmp/manifests/lambda.json" >/dev/null 2>&1 && [ "$(git -C "$tmp/mirror
   ok "existing main kept, src tag added"; else no "existing main must not move"; fi
 
 # --- tampered existing src/<commit>: wrong parent -------------------------
-upstream "$tmp/up/mulberry" mulberry 1.0.0
-musha=$(git -C "$tmp/up/mulberry" rev-parse HEAD)
-manifest mulberry "$tmp/up/mulberry" "$musha"
+upstream "$tmp/zenlabscorp/mulberry" mulberry 1.0.0
+musha=$(git -C "$tmp/zenlabscorp/mulberry" rev-parse HEAD)
+manifest mulberry "$tmp/zenlabscorp/mulberry" "$musha"
 git init -q "$tmp/museed"
 echo '{"name":"mulberry"}' >"$tmp/museed/MIRROR.json"; gi -C "$tmp/museed" add -A; gi -C "$tmp/museed" commit -qm orphan
 gi -C "$tmp/museed" tag -a -m t "src/$musha"
@@ -189,9 +190,9 @@ env >"$tmp/go-env.txt"
 exec "$realgo" "\$@"
 FAKE
 chmod +x "$tmp/fakebin/go"
-upstream "$tmp/up/nutmeg" nutmeg 1.0.0
-nsha=$(git -C "$tmp/up/nutmeg" rev-parse HEAD)
-manifest nutmeg "$tmp/up/nutmeg" "$nsha"
+upstream "$tmp/zenlabscorp/nutmeg" nutmeg 1.0.0
+nsha=$(git -C "$tmp/zenlabscorp/nutmeg" rev-parse HEAD)
+manifest nutmeg "$tmp/zenlabscorp/nutmeg" "$nsha"
 if err=$(PATH=$tmp/fakebin:$PATH SDK_PUBLIC=true FAKE_GO_TOUCH=main.go "$m" "$tmp/manifests/nutmeg.json" 2>&1); then no "go mod vendor outside vendor/ rejected"
 elif [[ $err == *"changed files outside"* ]]; then ok "go mod vendor outside vendor/ rejected"
 else no "vendor outside: $err"; fi
@@ -200,15 +201,15 @@ PATH=$tmp/fakebin:$PATH SDK_PUBLIC=true GH_TOKEN=sekret-token-value "$m" "$tmp/m
 if [ -s "$tmp/go-env.txt" ] && ! grep -q 'GH_TOKEN\|sekret-token-value' "$tmp/go-env.txt"; then ok "GH_TOKEN absent from the go mod vendor environment"; else no "GH_TOKEN reached go mod vendor"; fi
 
 # --- plugin in a subdirectory, vendored under the subdir ------------------
-mkdir -p "$tmp/up/sigma/plugins/sigma"
-git init -q "$tmp/up/sigma"
-printf '{"name":"sigma","version":"0.2.0","sdk":"^0.10"}\n' >"$tmp/up/sigma/plugins/sigma/plugin.json"
-printf 'package main\n\nimport "example.com/dep"\n\nfunc main() { _ = dep.Hi() }\n' >"$tmp/up/sigma/plugins/sigma/main.go"
-printf 'module example.com/sigma\n\ngo 1.22\n\nrequire example.com/dep v1.0.0\n' >"$tmp/up/sigma/plugins/sigma/go.mod"
-(cd "$tmp/up/sigma/plugins/sigma" && go mod tidy >/dev/null 2>&1)
-gi -C "$tmp/up/sigma" add -A; gi -C "$tmp/up/sigma" commit -qm init
-ssha=$(git -C "$tmp/up/sigma" rev-parse HEAD)
-manifest sigma "$tmp/up/sigma" "$ssha" '.subdir = "plugins/sigma"'
+mkdir -p "$tmp/zenlabscorp/sigma/plugins/sigma"
+git init -q "$tmp/zenlabscorp/sigma"
+printf '{"name":"sigma","version":"0.2.0","sdk":"^0.10"}\n' >"$tmp/zenlabscorp/sigma/plugins/sigma/plugin.json"
+printf 'package main\n\nimport "example.com/dep"\n\nfunc main() { _ = dep.Hi() }\n' >"$tmp/zenlabscorp/sigma/plugins/sigma/main.go"
+printf 'module example.com/sigma\n\ngo 1.22\n\nrequire example.com/dep v1.0.0\n' >"$tmp/zenlabscorp/sigma/plugins/sigma/go.mod"
+(cd "$tmp/zenlabscorp/sigma/plugins/sigma" && go mod tidy >/dev/null 2>&1)
+gi -C "$tmp/zenlabscorp/sigma" add -A; gi -C "$tmp/zenlabscorp/sigma" commit -qm init
+ssha=$(git -C "$tmp/zenlabscorp/sigma" rev-parse HEAD)
+manifest sigma "$tmp/zenlabscorp/sigma" "$ssha" '.subdir = "plugins/sigma"'
 if out=$(SDK_PUBLIC=true "$m" "$tmp/manifests/sigma.json" 2>&1); then
   sm=$tmp/mirrors/sigma
   stop=$(git -C "$sm" rev-parse "src/$ssha^{commit}")
@@ -218,14 +219,14 @@ if out=$(SDK_PUBLIC=true "$m" "$tmp/manifests/sigma.json" 2>&1); then
 else no "subdir run: $out"; fi
 
 # --- a symlink in the subdir chain is refused -----------------------------
-mkdir -p "$tmp/up/tau/real"
-git init -q "$tmp/up/tau"
-printf '{"name":"tau","version":"1.0.0","sdk":"^0.10"}\n' >"$tmp/up/tau/real/plugin.json"
-printf 'module example.com/tau\n\ngo 1.22\n' >"$tmp/up/tau/real/go.mod"
-ln -s real "$tmp/up/tau/link"
-gi -C "$tmp/up/tau" add -A; gi -C "$tmp/up/tau" commit -qm init
-tsha=$(git -C "$tmp/up/tau" rev-parse HEAD)
-manifest tau "$tmp/up/tau" "$tsha" '.subdir = "link"'
+mkdir -p "$tmp/zenlabscorp/tau/real"
+git init -q "$tmp/zenlabscorp/tau"
+printf '{"name":"tau","version":"1.0.0","sdk":"^0.10"}\n' >"$tmp/zenlabscorp/tau/real/plugin.json"
+printf 'module example.com/tau\n\ngo 1.22\n' >"$tmp/zenlabscorp/tau/real/go.mod"
+ln -s real "$tmp/zenlabscorp/tau/link"
+gi -C "$tmp/zenlabscorp/tau" add -A; gi -C "$tmp/zenlabscorp/tau" commit -qm init
+tsha=$(git -C "$tmp/zenlabscorp/tau" rev-parse HEAD)
+manifest tau "$tmp/zenlabscorp/tau" "$tsha" '.subdir = "link"'
 if err=$("$m" "$tmp/manifests/tau.json" 2>&1); then no "symlinked subdir refused"
 elif [[ $err == *"symlink"* ]]; then ok "symlinked subdir refused"; else no "symlinked subdir: $err"; fi
 
@@ -236,13 +237,13 @@ for case in pine=https://github.com/Zen-Labs-Corp/hatamoto-first-party \
             quince=https://github.com/zen-labs-corp/Hatamoto-First-Party \
             rowan=https://github.com/Zen-Labs-Corp/hatamoto-first-party.git; do
   n=${case%%=*}; url=${case#*=}
-  manifest "$n" "$tmp/up/amber" "$sha" \
+  manifest "$n" "$tmp/zenlabscorp/amber" "$sha" \
     "del(.author) | .tier = \"first-party\" | .repo = \"$url\""
   out=$(env -u MIRROR_BASE -u MIRROR_CREATE -u MIRROR_ORG -u GH_TOKEN PATH="$tmp/ghbin:$PATH" "$m" "$tmp/manifests/$n.json" 2>&1); rc=$?
   if [ $rc -eq 0 ] && [[ $out == *"$n: skipped: first-party"* ]]; then ok "first-party skipped: $url"; else no "first-party skipped: $url (rc=$rc $out)"; fi
   if [ ! -e "$tmp/mirrors/$n" ] && [ ! -e "$tmp/gh-called" ]; then ok "skip creates no mirror and calls no gh: $url"; else no "skip side effects: $url"; fi
 done
-# Not skipped: tier first-party but another repo; community author zen-labs-corp (file:// owner is the parent dir).
+# Not skipped: tier first-party but another repo; owner zen-labs-corp (file:// owner is the parent dir).
 upstream "$tmp/zen-labs-corp/spruce" spruce 1.0.0
 ssha=$(git -C "$tmp/zen-labs-corp/spruce" rev-parse HEAD)
 manifest spruce "$tmp/zen-labs-corp/spruce" "$ssha" 'del(.author) | .tier = "first-party"'
@@ -250,16 +251,16 @@ out=$("$m" "$tmp/manifests/spruce.json" 2>&1); rc=$?
 if [ $rc -eq 0 ] && [[ $out != *skipped* ]] && [ -d "$tmp/mirrors/spruce" ]; then ok "first-party with another repo is mirrored"; else no "first-party other repo: $out"; fi
 upstream "$tmp/zen-labs-corp/hatamoto-first-party" teak 1.0.0
 tsha2=$(git -C "$tmp/zen-labs-corp/hatamoto-first-party" rev-parse HEAD)
-manifest teak "$tmp/zen-labs-corp/hatamoto-first-party" "$tsha2" '.author = "zen-labs-corp"'
+manifest teak "$tmp/zen-labs-corp/hatamoto-first-party" "$tsha2" '.'
 out=$("$m" "$tmp/manifests/teak.json" 2>&1); rc=$?
-if [ $rc -eq 0 ] && [[ $out != *skipped* ]] && [ -d "$tmp/mirrors/teak" ]; then ok "community manifest is mirrored"; else no "community not skipped: $out"; fi
+if [ $rc -eq 0 ] && [[ $out != *skipped* ]] && [ -d "$tmp/mirrors/teak" ]; then ok "first-party manifest in a repo named like the monorepo is mirrored"; else no "not skipped: $out"; fi
 # Invalid first-party manifest (author present) still fails before the skip.
-manifest fpbad "$tmp/up/amber" "$sha" '.tier = "first-party" | .repo = "https://github.com/Zen-Labs-Corp/hatamoto-first-party" | .author = "Zen-Labs-Corp"'
+manifest fpbad "$tmp/zenlabscorp/amber" "$sha" '.tier = "first-party" | .repo = "https://github.com/Zen-Labs-Corp/hatamoto-first-party" | .author = "Zen-Labs-Corp"'
 out=$(env -u MIRROR_BASE -u MIRROR_CREATE PATH="$tmp/ghbin:$PATH" "$m" "$tmp/manifests/fpbad.json" 2>&1); rc=$?
 if [ $rc -ne 0 ] && [[ $out != *skipped* ]] && [ ! -e "$tmp/mirrors/fpbad" ]; then ok "invalid first-party manifest fails, not skipped"; else no "invalid first-party: $out"; fi
 
-# Tier half: exact first-party repo but no tier (community) is never skipped.
-manifest nofp "$tmp/up/amber" "$sha" '.repo = "https://github.com/Zen-Labs-Corp/hatamoto-first-party" | .author = "Zen-Labs-Corp"'
+# Tier half: exact first-party repo but no tier is never skipped.
+manifest nofp "$tmp/zenlabscorp/amber" "$sha" 'del(.tier) | .repo = "https://github.com/Zen-Labs-Corp/hatamoto-first-party"'
 out=$(env -u MIRROR_BASE -u MIRROR_CREATE -u MIRROR_ORG -u GH_TOKEN PATH="$tmp/ghbin:$PATH" "$m" "$tmp/manifests/nofp.json" 2>&1); rc=$?
 if [[ $out != *"skipped: first-party"* ]] && [ ! -e "$tmp/mirrors/nofp" ]; then ok "no tier on the first-party repo is not skipped (rc=$rc)"; else no "no-tier skipped: $out"; fi
 # Homoglyph repo (dotted capital I) case skipped: the validator rejects non-ASCII repos before the skip.

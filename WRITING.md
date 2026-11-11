@@ -1,13 +1,13 @@
 # Write a Hatamoto plugin in your own GitHub repo
 
-> **Status:** the Hatamoto SDK (`hatamoto.dev/sdk`, source at
+> **Note:** the Hatamoto SDK (`hatamoto.dev/sdk`, source at
 > <https://github.com/Zen-Labs-Corp/hatamoto-sdk>) is public: `go get` works today.
-> Community submissions to this registry open when Hatamoto core goes public.
 
 A plugin is a WebAssembly module built with the standard Go toolchain, plus a
 `plugin.json` that declares what it needs. It lives in your own repo. When it is
-ready, [submit it](CONTRIBUTING.md); approved plugins appear at
-<https://hatamoto.dev/plugins>.
+ready, [publish it](https://github.com/Zen-Labs-Corp/hatamoto/blob/main/docs/PLUGINS_WRITE_AND_SUBMIT.md#part-2-publish-your-plugin) from a
+developer account at <https://hatamoto.dev/developers>; approved plugins appear at
+<https://hatamoto.dev/plugins>. This repository lists first-party plugins only.
 
 The full plugin reference (hooks, payloads, host functions, permissions) is
 `docs/PLUGIN_API.md` in the Hatamoto core repository.
@@ -193,7 +193,7 @@ recommended.
 
 | Field | Meaning |
 |---|---|
-| `name` | `^[a-z][a-z0-9-]{1,39}$`; also the name of your manifest file here |
+| `name` | `^[a-z][a-z0-9-]{1,39}$` |
 | `version` | your plugin's semver; bump it for every release |
 | `sdk` | SDK range you built against, for example `^0.11` (declare `^0.12` only once your users run Hatamoto v0.31.0 or later; older hosts refuse it) |
 | `description` | shown on the directory page |
@@ -275,9 +275,9 @@ hatamoto keys generate --name mykey      # mykey.key (secret) + mykey.pub
 hatamoto plugin pack ./build --key mykey.key --out acme-seo.hmp
 ```
 
-Keep `mykey.key` out of git. This key is only for your own trials: the registry
-re-builds your plugin from source and signs it with the Hatamoto key, so your
-signature is never shipped.
+Keep `mykey.key` out of git. Use it for your own trials. A plugin you publish from a
+developer account is signed with your own key and Hatamoto does not re-sign it; the
+first-party plugins listed in this repository are signed with the registry key.
 
 To try the package on a development server, pick one:
 
@@ -294,17 +294,9 @@ To try the package on a development server, pick one:
   package, replacing an installed one of the same name. Nothing is stored and a
   restart reloads it. It is for development only, never for deployment.
 
-## 7. Publish your repo and submit
+## 7. Publish
 
-Push your code to GitHub, tag a release if you like, copy the 40 character commit
-id you want reviewed, and follow [CONTRIBUTING.md](CONTRIBUTING.md).
-
-The directory card heads with your plugin's `name` (for example `acme-seo`). To show
-a friendlier heading such as "Acme SEO Helper", add the optional manifest field
-`"title"` (1 to 60 characters, no control characters, no leading or trailing space); the `name` and version stay on the line
-below it.
-
-Every manifest also needs `"archive_grant": true` (your grant to archive, build,
-sign and redistribute the source at the pinned commit) and a `license` from the
-allowlist in [CONTRIBUTING.md](CONTRIBUTING.md). After the merge a copy of your
-source at the pinned commit is kept at `github.com/<archive>/<name>`.
+Push your code to GitHub, tag a release, and publish it from your developer account
+at <https://hatamoto.dev/developers>. The steps are in
+[Part 2 of the plugin guide](https://github.com/Zen-Labs-Corp/hatamoto/blob/main/docs/PLUGINS_WRITE_AND_SUBMIT.md#part-2-publish-your-plugin).
+This repository does not take manifests from outside authors.

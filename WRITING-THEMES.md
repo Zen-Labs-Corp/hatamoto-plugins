@@ -1,11 +1,10 @@
 # Write a Hatamoto theme in your own repo
 
-> **Status:** everything on this page works today with the `hatamoto` binary.
-> Community submissions to this registry open when Hatamoto core goes public, the
-> same moment as plugin submissions. When your theme is ready,
-> [submit it](CONTRIBUTING-THEMES.md); approved themes appear at
+> **Note:** everything on this page works today with the `hatamoto` binary. When your
+> theme is ready, [publish it](https://github.com/Zen-Labs-Corp/hatamoto/blob/main/docs/THEMES_WRITE_AND_SUBMIT.md#part-2-publish-your-theme) from a developer account at
+> <https://hatamoto.dev/developers>; approved themes appear at
 > <https://hatamoto.dev/themes> and install with one click from Admin > Settings >
-> Theme > Browse registry.
+> Theme > Browse registry. This repository lists first-party themes only.
 
 A theme is data: Go `html/template` files, CSS, JavaScript and JSON schemas,
 plus a `theme.json`. There is no SDK, no Go code and no build step. It lives in
@@ -19,7 +18,7 @@ The full theme reference (layouts, template funcs, sections, markers) is
 
 - The `hatamoto` binary, for `theme check` and `theme pack` (and `theme dev`,
   which also needs a running development server, see below).
-- A public git repo for your theme, or a place to host a zip over https.
+- A GitHub account, to attach your signed theme package to a release.
 
 ## 1. Lay out the files
 
@@ -49,7 +48,7 @@ Read that chapter before you start; this guide does not repeat it. The quickest
 start is to copy the files of the default theme that ships with Hatamoto and
 change them.
 
-A theme submitted to the registry must be self-contained. Ship your CSS, fonts,
+A theme published to the registry must be self-contained. Ship your CSS, fonts,
 images and scripts inside `assets/`; do not load anything from another host (see
 [Review criteria](CONTRIBUTING-THEMES.md#review-criteria)).
 
@@ -70,7 +69,7 @@ package format allows (`docs/PACKAGES.md`).
 
 | Field | Meaning |
 |---|---|
-| `name` | `^[a-z][a-z0-9-]{1,39}$`; also the name of your manifest file when you submit. `default` is reserved |
+| `name` | `^[a-z][a-z0-9-]{1,39}$`. `default` is reserved |
 | `version` | your theme's semver; bump it for every release |
 | `description` | shown on the directory card |
 | `screenshot` | **required for the registry**: path to a preview image under `assets/` |
@@ -91,7 +90,7 @@ checks the screenshot. The rules:
 
 Take it from the real theme running on sample content, not a mock-up. A
 screenshot that does not show what a site owner will get is a reason to refuse
-the submission.
+the theme.
 
 ## 4. Try it on a development server
 
@@ -125,13 +124,7 @@ passes here it passes there.
 
 `theme check` does not render your templates; step 4 does. Run both.
 
-If you will submit a zip instead of a git repo, check the zip too:
-
-```sh
-hatamoto theme check --archive theme.zip --sha256 "$(sha256sum theme.zip | cut -d' ' -f1)" --registry
-```
-
-Add `--expect-name kumo` to either form to fail when `theme.json` names a
+Add `--expect-name kumo` to fail when `theme.json` names a
 different theme.
 
 ## 6. Pack and try it as a package
@@ -141,14 +134,16 @@ hatamoto keys generate --name mykey      # mykey.key (secret) + mykey.pub
 hatamoto theme pack ./hatamoto-kumo --key mykey.key --out kumo.hmp
 ```
 
-Keep `mykey.key` out of git. This key is only for your own trials: the registry
-repacks your theme and signs it with the Hatamoto key, so your signature is never
-shipped. To install the package on a development server, trust your key with
+Keep `mykey.key` out of git. Use it for your own trials. A theme you publish from a
+developer account is signed with your own key and Hatamoto does not re-sign it; the
+first-party themes listed in this repository are signed with the registry key. To install the package on a development server, trust your key with
 `HATAMOTO_TRUSTED_KEYS` or allow unsigned packages, as described in
 `docs/THEMES.md` and `docs/PACKAGES.md`.
 
-## 7. Publish your repo and submit
+## 7. Publish
 
-Push your theme to a public git host, copy the 40 character commit id you want
-reviewed (or build the zip and its sha256), and follow
-[CONTRIBUTING-THEMES.md](CONTRIBUTING-THEMES.md).
+Pack the theme with your own key (step 6), attach the signed `.hmp` to a GitHub
+release, and submit that release link from your developer account at
+<https://hatamoto.dev/developers>. Other hosts are refused. The steps are in
+[Part 2 of the theme guide](https://github.com/Zen-Labs-Corp/hatamoto/blob/main/docs/THEMES_WRITE_AND_SUBMIT.md#part-2-publish-your-theme).
+This repository does not take manifests from outside authors.

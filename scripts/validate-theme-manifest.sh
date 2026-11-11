@@ -3,6 +3,9 @@
 #
 # The rules mirror schemas/theme-manifest.schema.json and the registry build
 # (registry/build-community-themes.sh in the Hatamoto core repo); keep them in sync.
+# This repository lists first-party themes only: the source must be a git repo owned by a
+# first-party owner. The core theme build does not check the owner (it is looser than this
+# validator); a matching core change is tracked separately.
 # The optional about and features keys follow check_about_features there.
 # Reserved names come from ../policy/reserved-names.txt next to this script; a missing,
 # unreadable or empty list rejects. The theme build still has a hardcoded reserved list and
@@ -29,6 +32,12 @@ licenses=(MIT Apache-2.0 BSD-2-Clause BSD-3-Clause ISC MPL-2.0)
 for l in GPL-2.0 GPL-3.0 LGPL-2.1 LGPL-3.0 AGPL-3.0; do
   licenses+=("$l" "$l-only" "$l-or-later")
 done
+
+# Owners whose repos may hold a listed theme (space separated, lowercase, compared
+# case-insensitively against the exact repo owner); keep in sync with FIRST_PARTY_OWNERS in
+# scripts/validate-manifest.sh and with schemas/theme-manifest.schema.json.
+FIRST_PARTY_OWNERS="zenlabscorp zen-labs-corp"
+portal=https://hatamoto.dev/developers
 
 # host_ok <url>: public DNS name only. No IP literal, localhost, single label,
 # internal suffix, port or credentials. Keep in sync with the registry build script.
@@ -248,6 +257,25 @@ else
   if has sha256 && ! [[ $sha256 =~ ^[a-f0-9]{64}$ ]]; then
     bad "sha256 must be 64 lowercase hex characters"
   fi
+fi
+
+# First-party only: a git source whose repo owner is on the allowlist. An archive has no
+# provable owner. A file:/// repo (offline tests only) uses its parent directory as the owner.
+if [ "$arc_src" -eq 1 ] && [ "$git_src" -eq 0 ]; then
+  bad "archive sources are not listed here; this repository lists first-party themes only, outside authors publish at $portal"
+elif [ "$git_src" -eq 1 ] && [ "$arc_src" -eq 0 ] && has repo; then
+  owner=""
+  if [[ $repo =~ ^https://github\.com/([A-Za-z0-9._-]+)/[A-Za-z0-9._-]+$ ]]; then
+    owner=${BASH_REMATCH[1]}
+  elif [[ $repo =~ ^file:///([A-Za-z0-9._/-]+)/[A-Za-z0-9._-]+$ ]]; then
+    owner=${BASH_REMATCH[1]##*/}
+  fi
+  owner=$(printf '%s' "$owner" | tr '[:upper:]' '[:lower:]')
+  owner_ok=0
+  for o in $FIRST_PARTY_OWNERS; do
+    if [ -n "$owner" ] && [ "$owner" = "$o" ]; then owner_ok=1; fi
+  done
+  [ "$owner_ok" -eq 1 ] || bad "repo must be https://github.com/<owner>/<repo> with owner one of: $FIRST_PARTY_OWNERS; this repository lists first-party themes only, outside authors publish at $portal"
 fi
 
 # Cross-kind uniqueness: only when the file sits in <root>/manifests/themes/.

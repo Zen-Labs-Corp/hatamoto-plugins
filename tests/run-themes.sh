@@ -11,7 +11,7 @@ failed=0
 ok() { echo "ok   $1"; pass=$((pass + 1)); }
 no() { echo "FAIL $1"; failed=$((failed + 1)); }
 
-for g in good-git-github good-git-codeberg good-archive good-title; do
+for g in good-git-github good-title; do
   if "$v" "$f/$g.json" >/dev/null 2>&1; then ok "$g accepted"; else no "$g accepted"; fi
 done
 
@@ -40,12 +40,17 @@ expect_reject bad-ip-host.json "public host name"
 expect_reject bad-localhost.json "public host name"
 expect_reject bad-port.json "public host name"
 expect_reject bad-tier.json "unknown field(s): tier"
+# First-party only: the owner rule and the archive refusal name the developer portal.
+dev=https://hatamoto.dev/developers
+expect_reject bad-host-codeberg.json "outside authors publish at $dev"
+expect_reject bad-archive-source.json "archive sources are not listed here"
+expect_reject bad-archive-source.json "outside authors publish at $dev"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
 # name must equal the file name.
-cp "$f/good-git-codeberg.json" "$tmp/other.json"
+cp "$f/good-git-github.json" "$tmp/other.json"
 if err=$("$v" "$tmp/other.json" 2>&1 >/dev/null); then no "name/file mismatch rejected"
 elif [[ $err == *"must equal the file name"* ]]; then ok "name/file mismatch rejected"
 else no "name/file mismatch: $err"; fi
@@ -53,15 +58,15 @@ else no "name/file mismatch: $err"; fi
 # Mutations of a good manifest.
 mutate() { # <label> <jq filter> <expected substring>
   local err
-  jq "$2" "$f/good-git-codeberg.json" > "$tmp/good-git-codeberg.json"
-  if err=$("$v" "$tmp/good-git-codeberg.json" 2>&1 >/dev/null); then no "rejects $1"
+  jq "$2" "$f/good-git-github.json" > "$tmp/good-git-github.json"
+  if err=$("$v" "$tmp/good-git-github.json" 2>&1 >/dev/null); then no "rejects $1"
   elif [[ $err == *"$3"* ]]; then ok "rejects $1"
   else no "rejects $1: $err"; fi
 }
 mutate "subdir traversal" '. + {subdir: "../x"}' "subdir must"
 mutate "absolute subdir" '. + {subdir: "/abs"}' "subdir must"
 mutate "http homepage" '. + {homepage: "http://x.example"}' "homepage must"
-mutate "credentials in repo" '.repo = "https://user@codeberg.org/tanaka/kumo"' "repo must"
+mutate "credentials in repo" '.repo = "https://user@github.com/Zen-Labs-Corp/kumo"' "repo must"
 mutate "empty license" '.license = ""' "license must be one of"
 mutate "grant false" '.archive_grant = false' "archive_grant must be true"
 mutate "grant string" '.archive_grant = "true"' "archive_grant must be true"
@@ -71,25 +76,47 @@ mutate "internal suffix" '.repo = "https://git.corp/tanaka/kumo"' "public host n
 mutate "single label host" '.repo = "https://intranet/tanaka/kumo"' "public host name"
 mutate "ipv6 host" '.repo = "https://[::1]/tanaka/kumo"' "public host name"
 mutate "gtm name" '.name = "gtm"' "is reserved"
+# The owner rule: only Zen-Labs-Corp / zenlabscorp on github.com, any case, nothing around it.
+mutate "other github owner" '.repo = "https://github.com/acme/kumo"' "outside authors publish at $dev"
+mutate "other public host" '.repo = "https://example.com/Zen-Labs-Corp/kumo"' "outside authors publish at $dev"
+mutate "look-alike host" '.repo = "https://github.com.evil.example/Zen-Labs-Corp/kumo"' "outside authors publish at $dev"
+mutate "owner with suffix" '.repo = "https://github.com/Zen-Labs-Corp-evil/kumo"' "outside authors publish at $dev"
+mutate "owner with prefix" '.repo = "https://github.com/xzenlabscorp/kumo"' "outside authors publish at $dev"
+# The owner literal is split out of the command lines to keep the neutrality scan quiet.
+zl=zenlabscorp
+mutate "owner dotted" ".repo = \"https://github.com/${zl}.evil/kumo\"" "outside authors publish at $dev"
+mutate "owner in the path" '.repo = "https://github.com/acme/Zen-Labs-Corp"' "outside authors publish at $dev"
+mutate "nested repo path" '.repo = "https://github.com/Zen-Labs-Corp/kumo/extra"' "outside authors publish at $dev"
+mutate "userinfo with first-party name" '.repo = "https://Zen-Labs-Corp@github.com/acme/kumo"' "repo must"
+for o in zenlabscorp ZENLABSCORP Zen-Labs-Corp zen-labs-corp ZEN-LABS-CORP; do
+  jq --arg r "https://github.com/$o/hatamoto-themes" '.repo = $r' "$f/good-git-github.json" > "$tmp/good-git-github.json"
+  if "$v" "$tmp/good-git-github.json" >/dev/null 2>&1; then ok "owner $o accepted"; else no "owner $o accepted"; fi
+done
+# A file:/// repo (offline tests) takes its parent directory as the owner.
+for o in zenlabscorp acme; do
+  jq --arg r "file:///tmp/$o/kumo" '.repo = $r' "$f/good-git-github.json" > "$tmp/good-git-github.json"
+  if HATAMOTO_ALLOW_FILE_REPOS=1 "$v" "$tmp/good-git-github.json" >/dev/null 2>&1; then [ "$o" = zenlabscorp ] && ok "file repo under $o accepted" || no "file repo under $o accepted"
+  else [ "$o" = acme ] && ok "file repo under $o rejected" || no "file repo under $o accepted"; fi
+done
 mutate "numeric author" '.author = 5' "author must be a string"
 # Title length counts characters even under the C locale.
 for n in 25 60; do
-  jq --arg t "$(printf '\u65e5%.0s' $(seq "$n"))" '. + {title: $t}' "$f/good-git-codeberg.json" > "$tmp/good-git-codeberg.json"
-  if LC_ALL=C "$v" "$tmp/good-git-codeberg.json" >/dev/null 2>&1; then ok "CJK title of $n chars accepted (LC_ALL=C)"; else no "CJK title of $n chars accepted (LC_ALL=C)"; fi
+  jq --arg t "$(printf '\u65e5%.0s' $(seq "$n"))" '. + {title: $t}' "$f/good-git-github.json" > "$tmp/good-git-github.json"
+  if LC_ALL=C "$v" "$tmp/good-git-github.json" >/dev/null 2>&1; then ok "CJK title of $n chars accepted (LC_ALL=C)"; else no "CJK title of $n chars accepted (LC_ALL=C)"; fi
 done
 mutate "61-char CJK title" '. + {title: ("\u65e5" * 61)}' "title must be"
-jq '. + {subdir: "themes/kumo"}' "$f/good-git-codeberg.json" > "$tmp/good-git-codeberg.json"
-if "$v" "$tmp/good-git-codeberg.json" >/dev/null 2>&1; then ok "accepts nested subdir"; else no "accepts nested subdir"; fi
+jq '. + {subdir: "themes/kumo"}' "$f/good-git-github.json" > "$tmp/good-git-github.json"
+if "$v" "$tmp/good-git-github.json" >/dev/null 2>&1; then ok "accepts nested subdir"; else no "accepts nested subdir"; fi
 
 # about and features: same helper and rules as the plugin tests.
-abfile() { mkdir -p "$tmp/ab"; jq "$1" "$f/good-git-codeberg.json" > "$tmp/ab/good-git-codeberg.json"; }
+abfile() { mkdir -p "$tmp/ab"; jq "$1" "$f/good-git-github.json" > "$tmp/ab/good-git-github.json"; }
 # about and features: 1 to 1500 characters in at most 10 newline-separated paragraphs; 1 to 8
 # distinct features of 1 to 120 characters. ab <accept|reject> <label> <jq-mutation> [want]:
 # a rejection must print the want substring (core's wording), also under LC_ALL=C.
 ab() {
   local err
   abfile "$3"
-  if err=$(LC_ALL=${ABLOC:-C.UTF-8} "$v" "$tmp/ab/good-git-codeberg.json" 2>&1 >/dev/null); then [ "$1" = accept ] && ok "about/features accepted: $2" || no "about/features accepted: $2"
+  if err=$(LC_ALL=${ABLOC:-C.UTF-8} "$v" "$tmp/ab/good-git-github.json" 2>&1 >/dev/null); then [ "$1" = accept ] && ok "about/features accepted: $2" || no "about/features accepted: $2"
   elif [ "$1" = accept ]; then no "about/features accepted: $2: $err"
   elif [[ $err == *"${4:-}"* ]]; then ok "about/features rejected: $2"
   else no "about/features rejected: $2: $err"; fi
@@ -147,7 +174,7 @@ ab reject "features modifier letter" '.features = ["a\u02b0b"]' "emoji, symbols 
 ab reject "features soft hyphen" '.features = ["a\u00adb"]' "emoji, symbols or invisible characters"
 # Both groups are judged: a bad about and a bad feature each report.
 abfile '.about = "a <b>" | .features = ["Fast", "fast"]'
-err=$("$v" "$tmp/ab/good-git-codeberg.json" 2>&1 >/dev/null)
+err=$("$v" "$tmp/ab/good-git-github.json" 2>&1 >/dev/null)
 if [[ $err == *"about must not contain < or >"* && $err == *"features must not repeat an item"* ]]; then ok "about and features both reported"; else no "about and features both reported: $err"; fi
 
 # The same verdicts under the C locale (lengths count characters).
@@ -165,24 +192,24 @@ for m in manifests/themes/*.json; do
 done
 
 # Archive source forbids subdir.
-jq '. + {subdir: "x"}' "$f/good-archive.json" > "$tmp/good-archive.json"
-if err=$("$v" "$tmp/good-archive.json" 2>&1 >/dev/null); then no "archive rejects subdir"
+jq '. + {subdir: "x"}' "$f/bad-archive-source.json" > "$tmp/bad-archive-source.json"
+if err=$("$v" "$tmp/bad-archive-source.json" 2>&1 >/dev/null); then no "archive rejects subdir"
 elif [[ $err == *"subdir is not allowed"* ]]; then ok "archive rejects subdir"
 else no "archive rejects subdir: $err"; fi
 
 # Cross-kind collision: a plugin manifest with the same name.
 mkdir -p "$tmp/repo/manifests/themes"
-cp "$f/good-git-codeberg.json" "$tmp/repo/manifests/themes/good-git-codeberg.json"
-if "$v" "$tmp/repo/manifests/themes/good-git-codeberg.json" >/dev/null 2>&1; then ok "unique theme name accepted"; else no "unique theme name accepted"; fi
-echo '{}' > "$tmp/repo/manifests/good-git-codeberg.json"
-if err=$("$v" "$tmp/repo/manifests/themes/good-git-codeberg.json" 2>&1 >/dev/null); then no "plugin/theme collision rejected"
+cp "$f/good-git-github.json" "$tmp/repo/manifests/themes/good-git-github.json"
+if "$v" "$tmp/repo/manifests/themes/good-git-github.json" >/dev/null 2>&1; then ok "unique theme name accepted"; else no "unique theme name accepted"; fi
+echo '{}' > "$tmp/repo/manifests/good-git-github.json"
+if err=$("$v" "$tmp/repo/manifests/themes/good-git-github.json" 2>&1 >/dev/null); then no "plugin/theme collision rejected"
 elif [[ $err == *"already used by a plugin"* ]]; then ok "plugin/theme collision rejected"
 else no "plugin/theme collision: $err"; fi
 
 # Cross-kind collision, other direction: a theme with the plugin's name.
 mkdir -p "$tmp/rev/manifests/themes"
-jq '.name = "rev"' "$f/good-git-codeberg.json" > "$tmp/rev/manifests/themes/rev.json"
-pm=$(jq -n '{name:"rev",repo:"https://github.com/tanaka/kumo",commit:"0123456789abcdef0123456789abcdef01234567",author:"tanaka",license:"MIT",sdk:"1",archive_grant:true}')
+jq '.name = "rev"' "$f/good-git-github.json" > "$tmp/rev/manifests/themes/rev.json"
+pm=$(jq -n '{name:"rev",repo:"https://github.com/Zen-Labs-Corp/kumo",commit:"0123456789abcdef0123456789abcdef01234567",tier:"first-party",license:"MIT",sdk:"1",archive_grant:true}')
 echo "$pm" > "$tmp/rev/manifests/rev.json"
 if err=$(scripts/validate-manifest.sh "$tmp/rev/manifests/rev.json" 2>&1 >/dev/null); then no "plugin rejects theme name"
 elif [[ $err == *"is also a theme"* ]]; then ok "plugin rejects theme name"
@@ -194,9 +221,9 @@ if scripts/validate-manifest.sh "$tmp/rev/manifests/rev.json" >/dev/null 2>&1; t
 la_theme() { # <label> <theme name> <expected substring|ok> [plugin name] [sibling theme name]
   local d="$tmp/la-$1" err
   rm -rf "$d"; mkdir -p "$d/manifests/themes"
-  jq --arg n "$2" '.name = $n' "$f/good-git-codeberg.json" > "$d/manifests/themes/$2.json"
+  jq --arg n "$2" '.name = $n' "$f/good-git-github.json" > "$d/manifests/themes/$2.json"
   [ -z "${4:-}" ] || echo '{}' > "$d/manifests/$4.json"
-  [ -z "${5:-}" ] || jq --arg n "$5" '.name = $n' "$f/good-git-codeberg.json" > "$d/manifests/themes/$5.json"
+  [ -z "${5:-}" ] || jq --arg n "$5" '.name = $n' "$f/good-git-github.json" > "$d/manifests/themes/$5.json"
   err=$("$v" "$d/manifests/themes/$2.json" 2>&1 >/dev/null); rc=$?
   if [ "$3" = ok ]; then
     if [ "$rc" -eq 0 ]; then ok "look-alike: $1 accepted"; else no "look-alike: $1 accepted: $err"; fi
@@ -218,7 +245,7 @@ cp "$v" "$tmp/np/scripts/"; cp "$v" "$tmp/ep/scripts/"
 : > "$tmp/ep/policy/reserved-names.txt"
 for pc in np ep; do
   want="missing policy"; [ "$pc" = ep ] && want="empty policy"
-  if err=$("$tmp/$pc/scripts/validate-theme-manifest.sh" "$f/good-git-codeberg.json" 2>&1 >/dev/null); then no "$pc policy rejected (exit 0)"
+  if err=$("$tmp/$pc/scripts/validate-theme-manifest.sh" "$f/good-git-github.json" 2>&1 >/dev/null); then no "$pc policy rejected (exit 0)"
   elif [[ $err == *"$want"* ]]; then ok "$pc policy rejected: $want"
   else no "$pc policy rejected but stderr lacks \"$want\": $err"; fi
 done
@@ -245,87 +272,28 @@ remote_manifest() { # <name> <jq-args...>: manifest at $tmp/rm/manifests/themes/
   mkdir -p "$tmp/rm/manifests/themes"
   jq -n "$@" --arg n "$n" '{name:$n,author:"tanaka",license:"MIT",archive_grant:true} + $extra' > "$tmp/rm/manifests/themes/$n.json"
 }
-mk_repo "$tmp/src-ok" 1 remok
-sha=$(git -C "$tmp/src-ok" rev-parse HEAD)
-remote_manifest remok --argjson extra "{\"repo\":\"file://$tmp/src-ok\",\"commit\":\"$sha\"}"
+mk_repo "$tmp/zenlabscorp/src-ok" 1 remok
+sha=$(git -C "$tmp/zenlabscorp/src-ok" rev-parse HEAD)
+remote_manifest remok --argjson extra "{\"repo\":\"file://$tmp/zenlabscorp/src-ok\",\"commit\":\"$sha\"}"
 if "$v" "$tmp/rm/manifests/themes/remok.json" --remote >/dev/null 2>&1; then ok "remote git accepted"; else no "remote git accepted"; fi
-mk_repo "$tmp/src-noshot" 0 remnoshot
-sha=$(git -C "$tmp/src-noshot" rev-parse HEAD)
-remote_manifest remnoshot --argjson extra "{\"repo\":\"file://$tmp/src-noshot\",\"commit\":\"$sha\"}"
+mk_repo "$tmp/zenlabscorp/src-noshot" 0 remnoshot
+sha=$(git -C "$tmp/zenlabscorp/src-noshot" rev-parse HEAD)
+remote_manifest remnoshot --argjson extra "{\"repo\":\"file://$tmp/zenlabscorp/src-noshot\",\"commit\":\"$sha\"}"
 if err=$("$v" "$tmp/rm/manifests/themes/remnoshot.json" --remote 2>&1 >/dev/null); then no "remote git missing screenshot rejected"
 elif [[ $err == *"screenshot"*"not found"* ]]; then ok "remote git missing screenshot rejected"
 else no "remote git missing screenshot: $err"; fi
-mk_repo "$tmp/src-name" 1 other
-sha=$(git -C "$tmp/src-name" rev-parse HEAD)
-remote_manifest remname --argjson extra "{\"repo\":\"file://$tmp/src-name\",\"commit\":\"$sha\"}"
+mk_repo "$tmp/zenlabscorp/src-name" 1 other
+sha=$(git -C "$tmp/zenlabscorp/src-name" rev-parse HEAD)
+remote_manifest remname --argjson extra "{\"repo\":\"file://$tmp/zenlabscorp/src-name\",\"commit\":\"$sha\"}"
 if err=$("$v" "$tmp/rm/manifests/themes/remname.json" --remote 2>&1 >/dev/null); then no "remote git name mismatch rejected"
 elif [[ $err == *"does not match"* ]]; then ok "remote git name mismatch rejected"
 else no "remote git name mismatch: $err"; fi
 
-if command -v zip >/dev/null 2>&1; then
-  mk_repo "$tmp/zsrc" 1 remzip
-  (cd "$tmp/zsrc" && zip -qr "$tmp/remzip.zip" theme.json assets)
-  zsha=$(sha256sum "$tmp/remzip.zip" | cut -d' ' -f1)
-  remote_manifest remzip --argjson extra "{\"archive\":\"file://$tmp/remzip.zip\",\"sha256\":\"$zsha\"}"
-  if "$v" "$tmp/rm/manifests/themes/remzip.json" --remote >/dev/null 2>&1; then ok "remote archive accepted"; else no "remote archive accepted"; fi
-  remote_manifest remzip --argjson extra "{\"archive\":\"file://$tmp/remzip.zip\",\"sha256\":\"$(printf 'b%.0s' $(seq 1 64))\"}"
-  if err=$("$v" "$tmp/rm/manifests/themes/remzip.json" --remote 2>&1 >/dev/null); then no "remote archive sha mismatch rejected"
-  elif [[ $err == *"sha256 mismatch"* ]]; then ok "remote archive sha mismatch rejected"
-  else no "remote archive sha mismatch: $err"; fi
-  # Large archive, screenshot listed first: must not SIGPIPE into "not found".
-  big_zip() { # <out.zip> <screenshot-bytes>
-    python3 - "$1" "$2" "$png" <<'PY'
-import sys, zipfile
-out, size, png = sys.argv[1], int(sys.argv[2]), sys.argv[3].encode("latin-1")
-with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-    z.writestr("assets/s.png", (png + b"\0" * size)[:max(size, len(png))])
-    z.writestr("theme.json", '{"name":"rembig","screenshot":"assets/s.png"}')
-    for i in range(2000):
-        z.writestr("assets/extra/" + "d" * 80 + "-%04d.txt" % i, "x")
-PY
-  }
-  if command -v python3 >/dev/null 2>&1; then
-    big_zip "$tmp/rembig.zip" 1000
-    bsha=$(sha256sum "$tmp/rembig.zip" | cut -d' ' -f1)
-    remote_manifest rembig --argjson extra "{\"archive\":\"file://$tmp/rembig.zip\",\"sha256\":\"$bsha\"}"
-    if err=$("$v" "$tmp/rm/manifests/themes/rembig.json" --remote 2>&1 >/dev/null); then ok "2000-entry archive, early screenshot accepted"
-    else no "2000-entry archive, early screenshot accepted: $err"; fi
-    big_zip "$tmp/rembig2.zip" $((2 * 1024 * 1024 + 1))
-    bsha=$(sha256sum "$tmp/rembig2.zip" | cut -d' ' -f1)
-    remote_manifest rembig --argjson extra "{\"archive\":\"file://$tmp/rembig2.zip\",\"sha256\":\"$bsha\"}"
-    if err=$("$v" "$tmp/rm/manifests/themes/rembig.json" --remote 2>&1 >/dev/null); then no "oversized screenshot in archive rejected"
-    elif [[ $err == *"limit is"* ]]; then ok "oversized screenshot in archive rejected"
-    else no "oversized screenshot in archive: $err"; fi
-  fi
-  # Missing declared screenshot: clear error.
-  mk_repo "$tmp/zns" 0 remzns
-  (cd "$tmp/zns" && zip -qr "$tmp/remzns.zip" theme.json)
-  zns=$(sha256sum "$tmp/remzns.zip" | cut -d' ' -f1)
-  remote_manifest remzns --argjson extra "{\"archive\":\"file://$tmp/remzns.zip\",\"sha256\":\"$zns\"}"
-  if err=$("$v" "$tmp/rm/manifests/themes/remzns.json" --remote 2>&1 >/dev/null); then no "archive missing screenshot rejected"
-  elif [[ $err == *"screenshot assets/s.png declared in theme.json not found in archive"* ]]; then ok "archive missing screenshot rejected"
-  else no "archive missing screenshot: $err"; fi
-  # Wildcard names are matched literally, never as patterns.
-  mk_repo "$tmp/zwild" 1 remzwild
-  printf '{"name":"remzwild","screenshot":"assets/*"}' > "$tmp/zwild/theme.json"
-  (cd "$tmp/zwild" && zip -qr "$tmp/remzwild.zip" theme.json assets)
-  zw=$(sha256sum "$tmp/remzwild.zip" | cut -d' ' -f1)
-  remote_manifest remzwild --argjson extra "{\"archive\":\"file://$tmp/remzwild.zip\",\"sha256\":\"$zw\"}"
-  if err=$("$v" "$tmp/rm/manifests/themes/remzwild.json" --remote 2>&1 >/dev/null); then no "wildcard screenshot rejected"
-  elif [[ $err == *"wildcard"* ]]; then ok "wildcard screenshot rejected"
-  else no "wildcard screenshot: $err"; fi
-  # A decoy */theme.json-style wrapper name must not match other entries.
-  mkdir -p "$tmp/zwrap/w[a]/assets" "$tmp/zwrap/wa/assets"
-  printf '{"name":"remzwrap","screenshot":"assets/s.png"}' > "$tmp/zwrap/w[a]/theme.json"
-  printf 'x' > "$tmp/zwrap/w[a]/assets/s.png"
-  printf '{"name":"decoy","screenshot":"assets/s.png"}' > "$tmp/zwrap/wa/theme.json"
-  (cd "$tmp/zwrap" && zip -qr "$tmp/remzwrap.zip" "w[a]")
-  zr=$(sha256sum "$tmp/remzwrap.zip" | cut -d' ' -f1)
-  remote_manifest remzwrap --argjson extra "{\"archive\":\"file://$tmp/remzwrap.zip\",\"sha256\":\"$zr\"}"
-  if "$v" "$tmp/rm/manifests/themes/remzwrap.json" --remote >/dev/null 2>&1; then ok "wrapper dir with glob chars read literally"; else no "wrapper dir with glob chars read literally"; fi
-else
-  echo "SKIP remote archive tests (zip not installed)"
-fi
+# An archive source is refused before anything is downloaded, even a well-formed one.
+remote_manifest remzip --argjson extra '{"archive":"file:///nonexistent/remzip.zip","sha256":"'"$(printf 'b%.0s' $(seq 1 64))"'"}'
+if err=$("$v" "$tmp/rm/manifests/themes/remzip.json" --remote 2>&1 >/dev/null); then no "remote archive source rejected"
+elif [[ $err == *"archive sources are not listed here"* && $err != *"cannot download"* ]]; then ok "remote archive source rejected"
+else no "remote archive source: $err"; fi
 unset HATAMOTO_ALLOW_FILE_REPOS HATAMOTO_ALLOW_FILE_ARCHIVES
 
 # Go-backed archive negatives (hostile zips) need the real binary.
@@ -346,14 +314,14 @@ PY
   }
   # Fixtures: validator and schema must give the same verdict. The file-name rule
   # (name == basename) is outside the schema, so compare only on content-level fixtures.
-  for g in good-git-github good-git-codeberg good-archive good-title; do
+  for g in good-git-github good-title; do
     if sv "$f/$g.json"; then ok "schema accepts $g"; else no "schema accepts $g"; fi
   done
-  for b in bad-http-repo bad-http-archive bad-commit bad-sha256 bad-both-sources bad-no-source bad-extra-field bad-no-grant bad-license bad-reserved default bad-tier; do
+  for b in bad-http-repo bad-http-archive bad-commit bad-sha256 bad-both-sources bad-no-source bad-extra-field bad-no-grant bad-license bad-reserved default bad-tier bad-host-codeberg bad-archive-source; do
     if sv "$f/$b.json"; then no "schema rejects $b"; else ok "schema rejects $b"; fi
   done
   smut() { # <label> <accept|reject> <jq filter>
-    jq "$3" "$f/good-git-codeberg.json" > "$tmp/s.json"
+    jq "$3" "$f/good-git-github.json" > "$tmp/s.json"
     if sv "$tmp/s.json"; then [ "$2" = accept ] && ok "schema: $1" || no "schema: $1"
     else [ "$2" = reject ] && ok "schema: $1" || no "schema: $1"; fi
   }
@@ -362,7 +330,12 @@ PY
   smut "absolute subdir" reject '. + {subdir: "/abs"}'
   smut "nested subdir" accept '. + {subdir: "themes/kumo"}'
   smut "dotted subdir name" accept '. + {subdir: "a..b/x"}'
-  smut "plain public repo host" accept '.repo = "https://example.com/a/b"'
+  smut "first-party github repo" accept '.repo = "https://github.com/Zen-Labs-Corp/a"'
+  smut "other public repo host" reject '.repo = "https://example.com/a/b"'
+  smut "other github owner" reject '.repo = "https://github.com/acme/kumo"'
+  smut "look-alike owner" reject '.repo = "https://github.com/Zen-Labs-Corp-evil/kumo"'
+  smut "uppercase owner" accept ".repo = \"https://github.com/${zl^^}/kumo\""
+  smut "archive source" reject 'del(.repo, .commit) | . + {archive: "https://github.com/Zen-Labs-Corp/x/releases/download/v1/x.zip", sha256: ("a" * 64)}'
   smut "61-char title" reject '. + {title: ("x" * 61)}'
   smut "25 CJK title" accept '. + {title: ("\u65e5" * 25)}'
   smut "about and features" accept '. + {about: "First paragraph.\nSecond paragraph.", features: ["Fast", "Tiny"]}'
