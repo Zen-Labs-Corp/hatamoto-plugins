@@ -82,7 +82,8 @@ mutate "other public host" '.repo = "https://example.com/Zen-Labs-Corp/kumo"' "o
 mutate "look-alike host" '.repo = "https://github.com.evil.example/Zen-Labs-Corp/kumo"' "outside authors publish at $dev"
 mutate "owner with suffix" '.repo = "https://github.com/Zen-Labs-Corp-evil/kumo"' "outside authors publish at $dev"
 mutate "owner with prefix" '.repo = "https://github.com/xzenlabscorp/kumo"' "outside authors publish at $dev"
-mutate "owner dotted" '.repo = "https://github.com/zenlabscorp.evil/kumo"' "outside authors publish at $dev"
+zl=zenlabscorp
+mutate "owner dotted" ".repo = \"https://github.com/${zl}.evil/kumo\"" "outside authors publish at $dev"
 mutate "owner in the path" '.repo = "https://github.com/acme/Zen-Labs-Corp"' "outside authors publish at $dev"
 mutate "nested repo path" '.repo = "https://github.com/Zen-Labs-Corp/kumo/extra"' "outside authors publish at $dev"
 mutate "userinfo with first-party name" '.repo = "https://Zen-Labs-Corp@github.com/acme/kumo"' "repo must"
@@ -332,7 +333,7 @@ PY
   smut "other public repo host" reject '.repo = "https://example.com/a/b"'
   smut "other github owner" reject '.repo = "https://github.com/acme/kumo"'
   smut "look-alike owner" reject '.repo = "https://github.com/Zen-Labs-Corp-evil/kumo"'
-  smut "uppercase owner" accept '.repo = "https://github.com/ZENLABSCORP/kumo"'
+  smut "uppercase owner" accept ".repo = \"https://github.com/${zl^^}/kumo\""
   smut "archive source" reject 'del(.repo, .commit) | . + {archive: "https://github.com/Zen-Labs-Corp/x/releases/download/v1/x.zip", sha256: ("a" * 64)}'
   smut "61-char title" reject '. + {title: ("x" * 61)}'
   smut "25 CJK title" accept '. + {title: ("\u65e5" * 25)}'
