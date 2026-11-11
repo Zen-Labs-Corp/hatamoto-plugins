@@ -3,6 +3,9 @@
 #
 # The rules mirror manifests/schema.json and the registry build script
 # (registry/build-community.sh in the Hatamoto core repo); keep the three in sync.
+# This repository lists first-party plugins only, so tier "first-party" is required
+# here. The core build script still accepts a manifest without a tier (it is looser
+# than this validator); a matching core change is tracked separately.
 # The optional about and features keys follow check_about_features there.
 # The listing rules (author, name, title, description) read their word lists from
 # ../policy next to this script. The registry build reads the same files from a
@@ -252,27 +255,22 @@ for o in $FIRST_PARTY_OWNERS; do
   if [ -n "$owner" ] && [ "$owner" = "$o" ]; then owner_ok=1; fi
 done
 
-# tier: only "first-party", only from an allowlisted owner, never with an author.
-if has tier; then
-  if [ "$tier" != "first-party" ]; then
-    bad "tier must be \"first-party\" when present"
-  else
-    [ "$owner_ok" -eq 1 ] || bad "tier first-party requires a repo owned by: $FIRST_PARTY_OWNERS"
-    has author && bad "author must be absent for tier first-party"
-  fi
+# tier: required, only "first-party", only from an allowlisted owner, never with an
+# author. This repository lists first-party plugins only; outside authors publish
+# through the developer portal.
+if ! has tier; then
+  bad "missing required field: tier (outside authors publish at https://hatamoto.dev/developers)"
+elif [ "$tier" != "first-party" ]; then
+  bad "tier must be \"first-party\"; outside authors publish at https://hatamoto.dev/developers"
 else
-  has author || bad "missing required field: author"
+  [ "$owner_ok" -eq 1 ] || bad "tier first-party requires a repo owned by: $FIRST_PARTY_OWNERS; outside authors publish at https://hatamoto.dev/developers"
+  has author && bad "author must be absent for tier first-party"
 fi
 
 # First-party exempt from the brand and reserved-name rules: tier first-party
 # from an allowlisted owner.
 fpx=0
 if has tier && [ "$tier" = "first-party" ] && [ "$owner_ok" -eq 1 ]; then fpx=1; fi
-
-# Author of a community listing must be the repo owner (case-insensitive).
-if has author && ! has tier && [ "$(printf '%s' "$author" | tr '[:upper:]' '[:lower:]')" != "$owner" ]; then
-  bad "author \"$author\" must equal the repo owner \"$owner\""
-fi
 
 # Reserved names. gtm and searchconsole are first-party only; webhooks and hello
 # are never accepted. Keep in sync with the registry build script.

@@ -14,6 +14,13 @@ no() { echo "FAIL $1"; failed=$((failed + 1)); }
 # good: exit 0.
 if "$v" "$f/good.json" >/dev/null 2>&1; then ok "good.json accepted"; else no "good.json accepted"; fi
 
+# com: the shape of a manifest from an outside author (no tier, an author, someone else's repo).
+# The validator refuses it for the missing tier; the other listing rules still run on it, so the
+# tests below that exercise them build from this shape and ignore the tier line (rules_err).
+com='del(.tier) | del(.subdir) | .author = "acme" | .repo = "https://github.com/acme/hatamoto-good"'
+# rules_err <file>: the validator's stderr without the missing-tier line; empty when only the tier is wrong.
+rules_err() { "$v" "$1" 2>&1 >/dev/null | grep -v 'missing required field: tier' || true; }
+
 # bad: non-zero exit and an expected stderr substring.
 expect_reject() {
   local file=$1 want=$2 err
@@ -36,7 +43,7 @@ expect_reject bad-title-script.json "title mixes scripts"
 expect_reject bad-title-words.json 'banned word "best"'
 expect_reject missing-grant.json "missing required field: archive_grant"
 expect_reject bad-grant.json "archive_grant must be true"
-expect_reject bad-author.json 'author "google" must equal the repo owner "acme"'
+expect_reject bad-author.json "outside authors publish at https://hatamoto.dev/developers"
 expect_reject bad-name-brand.json 'name must not start with the brand "stripe"'
 expect_reject bad-name-reserved.json 'name "seo" is reserved'
 expect_reject bad-name-token.json 'contains the banned word "beta"'
@@ -50,9 +57,9 @@ if err=$("$v" "$tmp/other.json" 2>&1 >/dev/null); then no "name/file mismatch re
 elif [[ $err == *"must equal the file name"* ]]; then ok "name/file mismatch rejected"
 else no "name/file mismatch: $err"; fi
 
-# Reserved first-party names (community manifests, no tier).
+# Reserved first-party names (community-shaped manifests, no tier).
 for r in gtm webhooks searchconsole hello; do
-  jq --arg n "$r" '.name = $n' "$f/good.json" > "$tmp/$r.json"
+  jq --arg n "$r" ".name = \$n | $com" "$f/good.json" > "$tmp/$r.json"
   if err=$("$v" "$tmp/$r.json" 2>&1 >/dev/null); then no "reserved name $r rejected"
   elif [[ $err == *"reserved for a first-party plugin"* ]]; then ok "reserved name $r rejected"
   else no "reserved name $r: $err"; fi
@@ -96,35 +103,34 @@ reject_fp "hello first-party from zenlabscorp" "reserved for a first-party plugi
 for o in zenlabscorp-evil zenlabscorpx zenlabscorp.evil xzenlabscorp zen-labs-corp-evil zen-labs-corpx xzen-labs-corp; do
   reject_fp "look-alike owner $o" "tier first-party requires" gtm . "$o"
 done
-# tier on a community-owned good.json (author present, acme owner) is refused too.
-jq '. + {"tier": "first-party"}' "$f/good.json" > "$tmp/good.json"
+# tier on an acme-owned manifest with an author is refused too.
+jq "$com | . + {\"tier\": \"first-party\"}" "$f/good.json" > "$tmp/good.json"
 if "$v" "$tmp/good.json" >/dev/null 2>&1; then no "community manifest with tier rejected"; else ok "community manifest with tier rejected"; fi
-# author is still required without a tier.
-jq 'del(.author)' "$f/good.json" > "$tmp/good.json"
-if err=$("$v" "$tmp/good.json" 2>&1 >/dev/null); then no "missing author rejected"
-elif [[ $err == *"missing required field: author"* ]]; then ok "missing author rejected"; else no "missing author: $err"; fi
+# A manifest without a tier is refused and points outside authors to the developer portal.
+dev=https://hatamoto.dev/developers
+reject_fp "missing tier" "missing required field: tier (outside authors publish at $dev)" acme-seo 'del(.tier)'
+reject_fp "community-style manifest" "$dev" acme-seo "$com" acme
+reject_fp "tier community names the portal" "$dev" acme-seo '.tier = "community"'
+reject_fp "first-party tier from another owner names the portal" "$dev" acme-seo . acme
 
-# Author must equal the repo owner, case-insensitively; a listed brand owner may use the brand.
-jq '.author = "ACME"' "$f/good.json" > "$tmp/good.json"
-if "$v" "$tmp/good.json" >/dev/null 2>&1; then ok "author compared case-insensitively"; else no "author compared case-insensitively"; fi
-for n in acme-stripe; do
-  jq --arg n "$n" '.name = $n' "$f/good.json" > "$tmp/$n.json"
-  if "$v" "$tmp/$n.json" >/dev/null 2>&1; then ok "accepts name $n"; else no "accepts name $n"; fi
-done
-jq '.name = "google-sync" | .repo = "https://github.com/Zen-Labs-Corp/x"' "$f/good.json" | jq '.author = "zen-labs-corp"' > "$tmp/google-sync.json"
-if "$v" "$tmp/google-sync.json" >/dev/null 2>&1; then ok "brand owner may use the brand"; else no "brand owner may use the brand"; fi
-jq '.name = "google-sync"' "$f/good.json" > "$tmp/google-sync.json"
-if "$v" "$tmp/google-sync.json" >/dev/null 2>&1; then no "brand rejected for another owner"; else ok "brand rejected for another owner"; fi
+# A listed brand owner may use the brand; another owner may not (community-shaped input).
+jq ".name = \"acme-stripe\" | $com" "$f/good.json" > "$tmp/acme-stripe.json"
+if [ -z "$(rules_err "$tmp/acme-stripe.json")" ]; then ok "accepts name acme-stripe (rules)"; else no "accepts name acme-stripe (rules)"; fi
+jq ".name = \"google-sync\" | $com | .repo = \"https://github.com/Zen-Labs-Corp/x\"" "$f/good.json" > "$tmp/google-sync.json"
+if [ -z "$(rules_err "$tmp/google-sync.json")" ]; then ok "brand owner may use the brand"; else no "brand owner may use the brand"; fi
+jq ".name = \"google-sync\" | $com" "$f/good.json" > "$tmp/google-sync.json"
+if [[ $(rules_err "$tmp/google-sync.json") == *"must not start with the brand"* ]]; then ok "brand rejected for another owner"; else no "brand rejected for another owner"; fi
 
 # Look-alike names against sibling manifests (themes included) and reserved names.
 mkdir -p "$tmp/lk/themes"
-jq '.name = "acme-sync"' "$f/good.json" > "$tmp/lk/acme-sync.json"
-jq '.name = "gtm" | .tier = "first-party" | .repo = "https://github.com/Zen-Labs-Corp/x" | del(.author)' "$f/good.json" > "$tmp/lk/gtm.json"
+jq ".name = \"acme-sync\" | $com" "$f/good.json" > "$tmp/lk/acme-sync.json"
+jq '.name = "gtm" | .repo = "https://github.com/Zen-Labs-Corp/x"' "$f/good.json" > "$tmp/lk/gtm.json"
 echo '{}' > "$tmp/lk/themes/sumi-ink.json"
 lk() { # lk <accept|reject> <name> [want]: a rejection must print the want substring.
   local err
-  jq --arg n "$2" '.name = $n' "$f/good.json" > "$tmp/lk/$2.json"
-  if err=$("$v" "$tmp/lk/$2.json" 2>&1 >/dev/null); then [ "$1" = accept ] && ok "look-alike: accepts $2" || no "look-alike: accepts $2"
+  jq --arg n "$2" ".name = \$n | $com" "$f/good.json" > "$tmp/lk/$2.json"
+  err=$(rules_err "$tmp/lk/$2.json")
+  if [ -z "$err" ]; then [ "$1" = accept ] && ok "look-alike: accepts $2" || no "look-alike: accepts $2"
   elif [ "$1" = accept ]; then no "look-alike: accepts $2: $err"
   elif [[ $err == *"${3:-}"* ]]; then ok "look-alike: rejects $2"
   else no "look-alike: rejects $2: $err"; fi
@@ -199,9 +205,11 @@ PY
   for o in zenlabscorp-evil zenlabscorpx zenlabscorp.evil; do fp gtm "$o"; sc reject "look-alike $o" "$tmp/gtm.json"; done
   fp gtm zenlabscorp; jq '.author = "zenlabscorp"' "$tmp/gtm.json" > "$tmp/x.json"; sc reject "tier with author" "$tmp/x.json"
   jq '.tier = "community"' "$tmp/gtm.json" > "$tmp/x.json"; sc reject "tier community" "$tmp/x.json"
-  jq 'del(.author)' "$f/good.json" > "$tmp/x.json"; sc reject "no tier, no author" "$tmp/x.json"
+  jq 'del(.tier)' "$f/good.json" > "$tmp/x.json"; sc reject "no tier" "$tmp/x.json"
+  jq "$com" "$f/good.json" > "$tmp/x.json"; sc reject "community-style manifest" "$tmp/x.json"
+  jq ".tier = \"x\" | .author = \"acme\"" "$f/good.json" > "$tmp/x.json"; sc reject "tier junk with author" "$tmp/x.json"
   for r in webhooks hello gtm searchconsole; do
-    jq --arg n "$r" '.name = $n' "$f/good.json" > "$tmp/x.json"; sc reject "community reserved name $r" "$tmp/x.json"
+    jq --arg n "$r" ".name = \$n | $com" "$f/good.json" > "$tmp/x.json"; sc reject "community reserved name $r" "$tmp/x.json"
   done
   for r in webhooks hello; do fp "$r" zenlabscorp; sc reject "first-party reserved name $r" "$tmp/$r.json"; done
   fp searchconsole zenlabscorp; sc accept "first-party searchconsole" "$tmp/searchconsole.json"
@@ -240,8 +248,9 @@ tt() {
   local m=${5:-good} err
   mkdir -p "$tmp/tt"
   if [ -n "${3:-}" ]; then m=gtm; fp gtm zenlabscorp; jq --arg t "$2" '.title = $t' "$tmp/gtm.json" > "$tmp/tt/gtm.json"
-  else jq --arg t "$2" --arg n "$m" '.title = $t | .name = $n' "$f/good.json" > "$tmp/tt/$m.json"; fi
-  if err=$("$v" "$tmp/tt/$m.json" 2>&1 >/dev/null); then [ "$1" = accept ] && ok "title accepted: $2" || no "title accepted: $2"
+  else jq --arg t "$2" --arg n "$m" ".title = \$t | .name = \$n | $com" "$f/good.json" > "$tmp/tt/$m.json"; fi
+  if [ -n "${3:-}" ]; then err=$("$v" "$tmp/tt/$m.json" 2>&1 >/dev/null) || true; else err=$(rules_err "$tmp/tt/$m.json"); fi
+  if [ -z "$err" ]; then [ "$1" = accept ] && ok "title accepted: $2" || no "title accepted: $2"
   elif [ "$1" = accept ]; then no "title accepted: $2: $err"
   elif [[ $err == *"${4:-}"* ]]; then ok "title rejected: $2"
   else no "title rejected: $2: $err"; fi
@@ -281,8 +290,9 @@ tt reject "Good Tools $(printf '\u2605')"
 tt reject "Good $(printf '\u0928\u092e\u0938\u094d\u0924\u0947')"
 # Look-alike letters and digit-only words: a title is compared after folding to ASCII.
 nm() { # nm <accept|reject> <name> <title> <want>
-  jq --arg n "$2" --arg t "$3" '.name = $n | .title = $t' "$f/good.json" > "$tmp/tt/$2.json"
-  if err=$("$v" "$tmp/tt/$2.json" 2>&1 >/dev/null); then [ "$1" = accept ] && ok "title accepted: $3" || no "title accepted: $3"
+  jq --arg n "$2" --arg t "$3" ".name = \$n | .title = \$t | $com" "$f/good.json" > "$tmp/tt/$2.json"
+  err=$(rules_err "$tmp/tt/$2.json")
+  if [ -z "$err" ]; then [ "$1" = accept ] && ok "title accepted: $3" || no "title accepted: $3"
   elif [ "$1" = accept ]; then no "title accepted: $3: $err"
   elif [[ $err == *"$4"* ]]; then ok "title rejected: $3"
   else no "title rejected: $3: $err"; fi
@@ -437,14 +447,14 @@ rd() {
 }
 # rj <accept|reject> <label> <raw plugin.json text> [want] [noun]: same fixture, raw plugin.json.
 rj() {
-  local want=$1 label=$2 raw=$3 msg=${4:-} noun=${5:-plugin.json} dir="$tmp/rd/own/descy" err
+  local want=$1 label=$2 raw=$3 msg=${4:-} noun=${5:-plugin.json} dir="$tmp/rd/zenlabscorp/descy" err
   rm -rf "$dir" "$tmp/rd/manifests"; mkdir -p "$dir" "$tmp/rd/manifests"
   printf '%s' "$raw" > "$dir/plugin.json"
   git -C "$dir" init -q
   git -C "$dir" add -A
   git -C "$dir" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -q -m init
   jq --arg r "file://$dir" --arg c "$(git -C "$dir" rev-parse HEAD)" \
-    '.name = "descy" | .repo = $r | .commit = $c | .author = "own" | .title = "Descy Tools"' "$f/good.json" > "$tmp/rd/manifests/descy.json"
+    '.name = "descy" | .repo = $r | .commit = $c | del(.subdir) | .title = "Descy Tools"' "$f/good.json" > "$tmp/rd/manifests/descy.json"
   if err=$(HATAMOTO_ALLOW_FILE_REPOS=1 "$v" "$tmp/rd/manifests/descy.json" --remote 2>&1 >/dev/null); then
     [ "$want" = accept ] && ok "$noun accepted: $label" || no "$noun accepted: $label"
   elif [ "$want" = accept ]; then no "$noun accepted: $label: $err"

@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Hatamoto community plugin manifest",
-  "$comment": "Shape rules only. The listing rules (author equals the repo owner, brand and reserved names, look-alike names, title words and scripts, plugin.json description) are enforced by scripts/validate-manifest.sh, which alone judges about and features beyond shape (paragraph count, empty paragraph, edge space, URL, emoji and invisible characters, case-insensitive duplicate features; a trailing newline in about is also a validator-only reject).",
+  "title": "Hatamoto first-party plugin manifest",
+  "$comment": "Shape rules only. This repository lists first-party plugins only: tier is required and the repo owner must be a first-party owner. The listing rules (brand and reserved names, look-alike names, title words and scripts, plugin.json description) are enforced by scripts/validate-manifest.sh, which alone judges about and features beyond shape (paragraph count, empty paragraph, edge space, URL, emoji and invisible characters, case-insensitive duplicate features; a trailing newline in about is also a validator-only reject).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["name", "repo", "commit", "license", "sdk", "archive_grant"],
+  "required": ["name", "repo", "commit", "license", "sdk", "archive_grant", "tier"],
   "properties": {
     "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,39}$" },
-    "repo": { "type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$" },
+    "repo": { "type": "string", "pattern": "^https://github\\.com/([Zz][Ee][Nn][Ll][Aa][Bb][Ss][Cc][Oo][Rr][Pp]|[Zz][Ee][Nn]-[Ll][Aa][Bb][Ss]-[Cc][Oo][Rr][Pp])/[A-Za-z0-9._-]+$" },
     "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "subdir": { "type": "string" },
     "title": { "type": "string", "minLength": 1, "maxLength": 40, "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f ]([^\\u0000-\\u001f\\u007f-\\u009f]*[^\\u0000-\\u001f\\u007f-\\u009f ])?$" },
@@ -20,14 +20,8 @@
     "homepage": { "type": "string", "pattern": "^https://" },
     "tier": { "const": "first-party" }
   },
-  "not": { "required": ["name"], "properties": { "name": { "enum": ["webhooks", "hello"] } } },
-  "if": { "required": ["tier"] },
-  "then": {
-    "not": { "required": ["author"] },
-    "properties": { "repo": { "pattern": "^https://github\\.com/([Zz][Ee][Nn][Ll][Aa][Bb][Ss][Cc][Oo][Rr][Pp]|[Zz][Ee][Nn]-[Ll][Aa][Bb][Ss]-[Cc][Oo][Rr][Pp])/[A-Za-z0-9._-]+$" } }
-  },
-  "else": {
-    "required": ["author"],
-    "not": { "required": ["name"], "properties": { "name": { "enum": ["gtm", "searchconsole"] } } }
-  }
+  "allOf": [
+    { "not": { "required": ["author"] } },
+    { "not": { "required": ["name"], "properties": { "name": { "enum": ["webhooks", "hello"] } } } }
+  ]
 }

@@ -182,7 +182,7 @@ else no "plugin/theme collision: $err"; fi
 # Cross-kind collision, other direction: a theme with the plugin's name.
 mkdir -p "$tmp/rev/manifests/themes"
 jq '.name = "rev"' "$f/good-git-codeberg.json" > "$tmp/rev/manifests/themes/rev.json"
-pm=$(jq -n '{name:"rev",repo:"https://github.com/tanaka/kumo",commit:"0123456789abcdef0123456789abcdef01234567",author:"tanaka",license:"MIT",sdk:"1",archive_grant:true}')
+pm=$(jq -n '{name:"rev",repo:"https://github.com/Zen-Labs-Corp/kumo",commit:"0123456789abcdef0123456789abcdef01234567",tier:"first-party",license:"MIT",sdk:"1",archive_grant:true}')
 echo "$pm" > "$tmp/rev/manifests/rev.json"
 if err=$(scripts/validate-manifest.sh "$tmp/rev/manifests/rev.json" 2>&1 >/dev/null); then no "plugin rejects theme name"
 elif [[ $err == *"is also a theme"* ]]; then ok "plugin rejects theme name"
