@@ -2,6 +2,7 @@
 # Self-test for scripts/validate-theme-manifest.sh (offline; --remote against local file:// sources).
 # The Go-backed theme check runs only when HATAMOTO_BIN is set.
 set -u
+export LC_ALL=C.UTF-8
 cd "$(dirname "$0")/.."
 v=scripts/validate-theme-manifest.sh
 f=tests/fixtures/themes
@@ -101,7 +102,7 @@ done
 mutate "numeric author" '.author = 5' "author must be a string"
 # Title length counts characters even under the C locale.
 for n in 25 60; do
-  jq --arg t "$(printf '\u65e5%.0s' $(seq "$n"))" '. + {title: $t}' "$f/good-git-github.json" > "$tmp/good-git-github.json"
+  jq --argjson n "$n" '. + {title: ("\u65e5" * $n)}' "$f/good-git-github.json" > "$tmp/good-git-github.json"
   if LC_ALL=C "$v" "$tmp/good-git-github.json" >/dev/null 2>&1; then ok "CJK title of $n chars accepted (LC_ALL=C)"; else no "CJK title of $n chars accepted (LC_ALL=C)"; fi
 done
 mutate "61-char CJK title" '. + {title: ("\u65e5" * 61)}' "title must be"
