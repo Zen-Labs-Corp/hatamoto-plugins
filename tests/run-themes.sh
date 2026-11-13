@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Self-test for scripts/validate-theme-manifest.sh (offline; --remote against local file:// sources).
-# Go-backed archive negatives run only when HATAMOTO_BIN is set.
+# The Go-backed theme check runs only when HATAMOTO_BIN is set.
 set -u
 cd "$(dirname "$0")/.."
 v=scripts/validate-theme-manifest.sh
@@ -296,11 +296,11 @@ elif [[ $err == *"archive sources are not listed here"* && $err != *"cannot down
 else no "remote archive source: $err"; fi
 unset HATAMOTO_ALLOW_FILE_REPOS HATAMOTO_ALLOW_FILE_ARCHIVES
 
-# Go-backed archive negatives (hostile zips) need the real binary.
+# The Go-backed validator runs only when the real binary is available.
 if [ -n "${HATAMOTO_BIN:-}" ]; then
   if "$HATAMOTO_BIN" theme check --help >/dev/null 2>&1; then ok "HATAMOTO_BIN theme check available"; else no "HATAMOTO_BIN theme check available"; fi
 else
-  echo "SKIP Go-backed archive negatives (HATAMOTO_BIN not set)"
+  echo "SKIP Go-backed theme check (HATAMOTO_BIN not set)"
 fi
 
 # schemas/theme-manifest.schema.json agrees with the validator. Needs python3 jsonschema;
