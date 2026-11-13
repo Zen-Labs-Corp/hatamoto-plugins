@@ -54,9 +54,6 @@ host_ok() {
   return 0
 }
 
-# unzip_escape <name>: unzip treats member names as wildcard patterns; escape them.
-unzip_escape() { printf '%s' "$1" | sed 's/[][*?\\]/\\&/g'; }
-
 usage() { echo "usage: $0 <manifest.json> [--remote]" >&2; exit 2; }
 
 [ $# -ge 1 ] && [ $# -le 2 ] || usage
@@ -260,7 +257,8 @@ else
 fi
 
 # First-party only: a git source whose repo owner is on the allowlist. An archive has no
-# provable owner. A file:/// repo (offline tests only) uses its parent directory as the owner.
+# provable owner, so remote archives are never fetched. A file:/// repo (offline tests only)
+# uses its parent directory as the owner.
 if [ "$arc_src" -eq 1 ] && [ "$git_src" -eq 0 ]; then
   bad "archive sources are not listed here; this repository lists first-party themes only, outside authors publish at $portal"
 elif [ "$git_src" -eq 1 ] && [ "$arc_src" -eq 0 ] && has repo; then
@@ -323,81 +321,31 @@ if [ "$remote" -eq 1 ]; then
   trap 'rm -rf "$tmp"' EXIT
   tj=""
   shot_size=""
-  if [ -n "$repo" ]; then
-    co="$tmp/co"
-    mkdir "$co"
-    git -C "$co" init -q
-    if ! git -C "$co" fetch -q --depth 1 "$repo" "$commit" 2>/dev/null; then
-      echo "$file: commit $commit not found in $repo" >&2
-      exit 1
-    fi
-    prefix=""
-    [ -z "$subdir" ] || prefix="${subdir%/}/"
-    if ! tj=$(git -C "$co" show "FETCH_HEAD:${prefix}theme.json" 2>/dev/null); then
-      echo "$file: no ${prefix}theme.json at commit $commit" >&2
-      exit 1
-    fi
-    shot=$(printf '%s' "$tj" | jq -er '.screenshot | strings' 2>/dev/null || true)
-    if [ -z "$shot" ]; then
-      echo "$file: theme.json has no screenshot (required)" >&2
-      exit 1
-    fi
-    if ! [[ $shot == assets/* ]] || [[ $shot =~ (^|/)\.\.(/|$) ]]; then
-      echo "$file: screenshot $shot must be under assets/" >&2
-      exit 1
-    fi
-    if ! shot_size=$(git -C "$co" cat-file -s "FETCH_HEAD:${prefix}${shot}" 2>/dev/null); then
-      echo "$file: screenshot $shot not found" >&2
-      exit 1
-    fi
-  else
-    protos='=https'
-    case $archive in file://*) protos='=file' ;; esac
-    if ! curl --proto "$protos" --proto-redir '=https' --max-redirs 5 --max-filesize 67108864 --max-time 60 -fsSL -o "$tmp/a.zip" "$archive"; then
-      echo "$file: cannot download $archive" >&2
-      exit 1
-    fi
-    got=$(sha256sum "$tmp/a.zip" | cut -d' ' -f1)
-    if [ "$got" != "$sha256" ]; then
-      echo "$file: sha256 mismatch (got $got)" >&2
-      exit 1
-    fi
-    # Wrapper-dir tolerant: theme.json at the root or exactly one directory down.
-    tpath=$(unzip -Z1 "$tmp/a.zip" | awk '$0=="theme.json" || $0 ~ /^[^\/]+\/theme\.json$/' | head -n1)
-    if [ -z "$tpath" ]; then
-      echo "$file: no theme.json in archive" >&2
-      exit 1
-    fi
-    tj=$(unzip -p "$tmp/a.zip" "$(unzip_escape "$tpath")")
-    shot=$(printf '%s' "$tj" | jq -er '.screenshot | strings' 2>/dev/null || true)
-    if [ -z "$shot" ]; then
-      echo "$file: theme.json has no screenshot (required)" >&2
-      exit 1
-    fi
-    if ! [[ $shot == assets/* ]] || [[ $shot =~ (^|/)\.\.(/|$) ]]; then
-      echo "$file: screenshot $shot must be under assets/" >&2
-      exit 1
-    fi
-    if [[ $shot == *[\*\?\[\]\\]* ]]; then
-      echo "$file: screenshot $shot must not contain wildcard characters (* ? [ ] \\)" >&2
-      exit 1
-    fi
-    wrap="${tpath%theme.json}"
-    # Capture the listing first: grep -q exiting early would SIGPIPE unzip (pipefail).
-    list=$(unzip -Z1 "$tmp/a.zip")
-    if ! grep -Fxq -- "${wrap}${shot}" <<<"$list"; then
-      echo "$file: screenshot ${wrap}${shot} declared in theme.json not found in archive" >&2
-      exit 1
-    fi
-    # Size comes from the zip listing (uncompressed size), never by inflating.
-    zlist=$(unzip -Zl "$tmp/a.zip")
-    shot_size=$(awk -v want="${wrap}${shot}" '
-      { n = $0; for (i = 0; i < 9; i++) sub(/^ *[^ ]+ +/, "", n) }
-      n == want && $1 !~ /^d/ { print $4; exit }' <<<"$zlist")
-    if ! [[ $shot_size =~ ^[0-9]+$ ]]; then
-      echo "$file: cannot read size of screenshot ${wrap}${shot} from archive" >&2
-      exit 1
-    fi
+  co="$tmp/co"
+  mkdir "$co"
+  git -C "$co" init -q
+  if ! git -C "$co" fetch -q --depth 1 "$repo" "$commit" 2>/dev/null; then
+    echo "$file: commit $commit not found in $repo" >&2
+    exit 1
+  fi
+  prefix=""
+  [ -z "$subdir" ] || prefix="${subdir%/}/"
+  if ! tj=$(git -C "$co" show "FETCH_HEAD:${prefix}theme.json" 2>/dev/null); then
+    echo "$file: no ${prefix}theme.json at commit $commit" >&2
+    exit 1
+  fi
+  shot=$(printf '%s' "$tj" | jq -er '.screenshot | strings' 2>/dev/null || true)
+  if [ -z "$shot" ]; then
+    echo "$file: theme.json has no screenshot (required)" >&2
+    exit 1
+  fi
+  if ! [[ $shot == assets/* ]] || [[ $shot =~ (^|/)\.\.(/|$) ]]; then
+    echo "$file: screenshot $shot must be under assets/" >&2
+    exit 1
+  fi
+  if ! shot_size=$(git -C "$co" cat-file -s "FETCH_HEAD:${prefix}${shot}" 2>/dev/null); then
+    echo "$file: screenshot $shot not found" >&2
+    exit 1
   fi
   tname=$(printf '%s' "$tj" | jq -r '.name // empty' 2>/dev/null || true)
   if [ "$tname" != "$name" ]; then
@@ -409,12 +357,8 @@ if [ "$remote" -eq 1 ]; then
     exit 1
   fi
   if [ -n "${HATAMOTO_BIN:-}" ]; then
-    if [ -n "$repo" ]; then
-      git -C "$co" checkout -q FETCH_HEAD
-      "$HATAMOTO_BIN" theme check "$co/${subdir%/}" --registry --expect-name "$name"
-    else
-      "$HATAMOTO_BIN" theme check --archive "$tmp/a.zip" --sha256 "$sha256" --registry --expect-name "$name"
-    fi
+    git -C "$co" checkout -q FETCH_HEAD
+    "$HATAMOTO_BIN" theme check "$co/${subdir%/}" --registry --expect-name "$name"
   fi
 fi
 

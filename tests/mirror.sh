@@ -262,7 +262,7 @@ if [ $rc -ne 0 ] && [[ $out != *skipped* ]] && [ ! -e "$tmp/mirrors/fpbad" ]; th
 # Tier half: exact first-party repo but no tier is never skipped.
 manifest nofp "$tmp/zenlabscorp/amber" "$sha" 'del(.tier) | .repo = "https://github.com/Zen-Labs-Corp/hatamoto-first-party"'
 out=$(env -u MIRROR_BASE -u MIRROR_CREATE -u MIRROR_ORG -u GH_TOKEN PATH="$tmp/ghbin:$PATH" "$m" "$tmp/manifests/nofp.json" 2>&1); rc=$?
-if [[ $out != *"skipped: first-party"* ]] && [ ! -e "$tmp/mirrors/nofp" ]; then ok "no tier on the first-party repo is not skipped (rc=$rc)"; else no "no-tier skipped: $out"; fi
+if [ $rc -ne 0 ] && [[ $out == *"missing required field: tier"* ]] && [[ $out != *"skipped: first-party"* ]] && [ ! -e "$tmp/mirrors/nofp" ]; then ok "no tier on the first-party repo is refused, not skipped"; else no "no-tier skipped: $out"; fi
 # Homoglyph repo (dotted capital I) case skipped: the validator rejects non-ASCII repos before the skip.
 
 # Fail when cases silently disappear.

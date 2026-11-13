@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Self-test for scripts/validate-theme-manifest.sh (offline; --remote against local file:// sources).
-# Go-backed archive negatives run only when HATAMOTO_BIN is set.
+# The Go-backed theme check runs only when HATAMOTO_BIN is set.
 set -u
+export LC_ALL=C.UTF-8
 cd "$(dirname "$0")/.."
 v=scripts/validate-theme-manifest.sh
 f=tests/fixtures/themes
@@ -101,7 +102,7 @@ done
 mutate "numeric author" '.author = 5' "author must be a string"
 # Title length counts characters even under the C locale.
 for n in 25 60; do
-  jq --arg t "$(printf '\u65e5%.0s' $(seq "$n"))" '. + {title: $t}' "$f/good-git-github.json" > "$tmp/good-git-github.json"
+  jq --argjson n "$n" '. + {title: ("\u65e5" * $n)}' "$f/good-git-github.json" > "$tmp/good-git-github.json"
   if LC_ALL=C "$v" "$tmp/good-git-github.json" >/dev/null 2>&1; then ok "CJK title of $n chars accepted (LC_ALL=C)"; else no "CJK title of $n chars accepted (LC_ALL=C)"; fi
 done
 mutate "61-char CJK title" '. + {title: ("\u65e5" * 61)}' "title must be"
@@ -296,11 +297,11 @@ elif [[ $err == *"archive sources are not listed here"* && $err != *"cannot down
 else no "remote archive source: $err"; fi
 unset HATAMOTO_ALLOW_FILE_REPOS HATAMOTO_ALLOW_FILE_ARCHIVES
 
-# Go-backed archive negatives (hostile zips) need the real binary.
+# The Go-backed validator runs only when the real binary is available.
 if [ -n "${HATAMOTO_BIN:-}" ]; then
   if "$HATAMOTO_BIN" theme check --help >/dev/null 2>&1; then ok "HATAMOTO_BIN theme check available"; else no "HATAMOTO_BIN theme check available"; fi
 else
-  echo "SKIP Go-backed archive negatives (HATAMOTO_BIN not set)"
+  echo "SKIP Go-backed theme check (HATAMOTO_BIN not set)"
 fi
 
 # schemas/theme-manifest.schema.json agrees with the validator. Needs python3 jsonschema;

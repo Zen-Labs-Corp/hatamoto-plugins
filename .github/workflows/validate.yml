@@ -4,16 +4,21 @@
 # manager, never by CI.
 #
 # The `judge` job reports on every pull request and runs only base-branch code: the
-# validator script and the policy/ word lists come from the base branch, and no pull
-# request code runs in that job. When a pull request changes nothing relevant it prints
-# a note and passes. When it changes policy/ or manifests/themes/ it re-judges every
-# plugin manifest in the repository with the base rules, not only the changed ones.
-# The base branch must already carry policy/; until it does the job fails closed when
-# plugin manifests are judged. A pull request that edits the workflow or scripts is
+# validator scripts and the policy/ word lists come from the base branch, and no pull
+# request code runs in that job. It judges changed plugin manifests with the base plugin
+# validator and changed theme manifests with the base theme validator (the first-party
+# owner rule lives there). When a pull request changes nothing relevant it prints a note
+# and passes. When it changes policy/ or manifests/themes/ it re-judges every plugin
+# manifest in the repository with the base rules, not only the changed ones; themes are
+# judged only when they change, because each judgement fetches the theme source.
+# The base branch must already carry policy/ and the validators; until it does the job
+# fails closed. A pull request that edits the workflow or scripts is
 # covered by maintainer review, not by this job. The Hatamoto registry build for plugins
 # (registry/build-community.sh in the Hatamoto core repository) reads the same policy/
 # from a checkout of this repository, and a missing, unreadable or empty list stops that
 # build. The theme build keeps its own reserved list until a follow-up reads policy/.
+# The `manifests` job also runs the theme validator from the pull request head; that run
+# is informational, `judge` is the check that cannot be weakened by the pull request.
 #
 # The `build` job compiles each changed plugin (themes have no build and no SDK) at its pinned commit. It needs the
 # public Hatamoto SDK (hatamoto.dev/sdk); it runs only when the repository variable
@@ -54,8 +59,8 @@ jobs:
           done < <(git diff -z --name-only --diff-filter=AMR "origin/$BASE_REF...HEAD" -- manifests)
           exit "$status"
 
-  # Judges plugin manifests. This job runs no code from the pull request: no tests, no
-  # PR-head scripts. The validator and policy/ come from the base branch.
+  # Judges plugin and theme manifests. This job runs no code from the pull request: no
+  # tests, no PR-head scripts. The validators and policy/ come from the base branch.
   judge:
     runs-on: ubuntu-latest
     steps:
@@ -63,7 +68,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Judge plugin manifests with the base branch validator and policy
+      - name: Judge manifests with the base branch validator and policy
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
@@ -73,23 +78,38 @@ jobs:
           trap 'rm -rf "$work"' EXIT
           # 1. What to judge: the changed manifests (type changes included, deletions not),
           # plus every tracked plugin manifest when policy/ or manifests/themes/ changed.
+          # Changed themes are judged on their own; the sweep stays plugin-only.
           # Deletions count for the sweep. Both lists are written first so a git failure stops the job.
           git diff -z --name-only --diff-filter=AMRT "origin/$BASE_REF...HEAD" -- manifests > "$work/changed"
           git diff -z --name-only "origin/$BASE_REF...HEAD" -- policy manifests/themes > "$work/sweepers"
           sweep=0
           if [ -s "$work/sweepers" ]; then
             sweep=1
-            git ls-files -z -- 'manifests/*.json' > "$work/tracked"
+            git ls-files -z -- 'manifests/*.json' ':(exclude)manifests/themes/*' > "$work/tracked"
           else
             : > "$work/tracked"
           fi
           files=()
+          themes=()
           declare -A seen=()
           while IFS= read -r -d '' f; do
             if [ -n "${seen[$f]:-}" ]; then continue; fi
             seen[$f]=1
             case "$f" in
-              manifests/README.md | manifests/schema.json | manifests/themes/README.md | manifests/themes/*.json) continue ;;
+              manifests/README.md | manifests/schema.json | manifests/themes/README.md) continue ;;
+              manifests/themes/*/*) echo "$f: theme manifests must be manifests/themes/<name>.json, no nested paths" >&2; status=1; continue ;;
+              manifests/themes/*.json)
+                base=${f#manifests/themes/}; base=${base%.json}
+                if ! [[ $base =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
+                  echo "$f: file name must be <name>.json with a valid theme name" >&2
+                  status=1; continue
+                fi
+                mode=$(git ls-files -s -- "$f" | cut -d' ' -f1)
+                if [ -L "$f" ] || [ "$mode" != 100644 ]; then
+                  echo "$f: a manifest must be a regular file, not a symlink or other type" >&2
+                  status=1; continue
+                fi
+                themes+=("$f"); continue ;;
               manifests/*.json) ;;
               manifests) echo "manifests must be a directory, not a symlink or a file" >&2; status=1; continue ;;
               manifests/*) echo "$f: only manifests/<name>.json files are allowed here" >&2; status=1; continue ;;
@@ -107,8 +127,8 @@ jobs:
             fi
             files+=("$f")
           done < <(cat "$work/changed" "$work/tracked")
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "judge: no plugin manifests, policy or themes changed; nothing to judge"
+          if [ "${#files[@]}" -eq 0 ] && [ "${#themes[@]}" -eq 0 ]; then
+            echo "judge: no plugin or theme manifests, policy or themes changed; nothing to judge"
             exit "$status"
           fi
           if [ "$sweep" -eq 1 ]; then echo "judge: policy or themes changed; judging every plugin manifest"; fi
@@ -125,9 +145,19 @@ jobs:
               exit 1
             fi
           done
-          # 3. Judge.
-          for f in "${files[@]}"; do
+          if [ "${#themes[@]}" -gt 0 ]; then
+            if ! git show "origin/$BASE_REF:scripts/validate-theme-manifest.sh" > "$trusted/scripts/validate-theme-manifest.sh"; then
+              echo "the base branch has no validator to judge theme manifests" >&2
+              exit 1
+            fi
+          fi
+          # 3. Judge. Validators run on the checkout path so they see the sibling
+          # manifests; only the validator script itself is the trusted base copy.
+          for f in ${files[@]+"${files[@]}"}; do
             bash "$trusted/scripts/validate-manifest.sh" "$f" --remote || status=1
+          done
+          for f in ${themes[@]+"${themes[@]}"}; do
+            bash "$trusted/scripts/validate-theme-manifest.sh" "$f" --remote || status=1
           done
           exit "$status"
 
