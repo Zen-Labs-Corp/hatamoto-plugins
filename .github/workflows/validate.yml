@@ -1,26 +1,29 @@
-# Validates plugin and theme manifests in pull requests (manifests/<name>.json and
-# manifests/themes/<name>.json) and runs the validator self-tests, including the
-# theme tests. No secrets, no signing: publishing is done by the Hatamoto release
+# Validates plugin, theme and kit manifests in pull requests (manifests/<name>.json,
+# manifests/themes/<name>.json and manifests/kits/<name>.json) and runs the validator
+# self-tests, including the theme and kit tests. No secrets, no signing: publishing is done by the Hatamoto release
 # manager, never by CI.
 #
 # The `judge` job reports on every pull request and runs only base-branch code: the
 # validator scripts and the policy/ word lists come from the base branch, and no pull
 # request code runs in that job. It judges changed plugin manifests with the base plugin
-# validator and changed theme manifests with the base theme validator (the first-party
-# owner rule lives there). When a pull request changes nothing relevant it prints a note
+# validator, changed theme manifests with the base theme validator and changed kit
+# manifests with the base kit validator (the first-party owner rule lives there). When a pull request changes nothing relevant it prints a note
 # and passes. When it changes policy/ or manifests/themes/ it re-judges every plugin
 # manifest in the repository with the base rules, not only the changed ones; themes are
-# judged only when they change, because each judgement fetches the theme source.
+# judged only when they change, because each judgement fetches the theme source. Kits are
+# judged with --remote only when they change; a policy/ change also re-checks every kit
+# manifest offline (no fetch) with the base validator; like the plugin sweep, that checks
+# against the base policy. Kits are never built and never mirrored.
 # The base branch must already carry policy/ and the validators; until it does the job
 # fails closed. A pull request that edits the workflow or scripts is
 # covered by maintainer review, not by this job. The Hatamoto registry build for plugins
 # (registry/build-community.sh in the Hatamoto core repository) reads the same policy/
 # from a checkout of this repository, and a missing, unreadable or empty list stops that
 # build. The theme build keeps its own reserved list until a follow-up reads policy/.
-# The `manifests` job also runs the theme validator from the pull request head; that run
+# The `manifests` job also runs the theme and kit validators from the pull request head; that run
 # is informational, `judge` is the check that cannot be weakened by the pull request.
 #
-# The `build` job compiles each changed plugin (themes have no build and no SDK) at its pinned commit. It needs the
+# The `build` job compiles each changed plugin (themes and kits have no build and no SDK) at its pinned commit. It needs the
 # public Hatamoto SDK (hatamoto.dev/sdk); it runs only when the repository variable
 # SDK_PUBLIC is 'true', which is set once the SDK repository is published.
 name: validate
@@ -45,6 +48,8 @@ jobs:
         run: bash tests/run.sh
       - name: Self-test the theme validator
         run: bash tests/run-themes.sh
+      - name: Self-test the kit validator
+        run: bash tests/run-kits.sh
       - name: Validate changed theme manifests
         env:
           BASE_REF: ${{ github.base_ref }}
@@ -58,8 +63,21 @@ jobs:
             esac
           done < <(git diff -z --name-only --diff-filter=AMR "origin/$BASE_REF...HEAD" -- manifests)
           exit "$status"
+      - name: Validate changed kit manifests
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          status=0
+          while IFS= read -r -d '' f; do
+            case "$f" in
+              manifests/kits/README.md) continue ;;
+              manifests/kits/*.json) scripts/validate-kit-manifest.sh "$f" --remote || status=1 ;;
+            esac
+          done < <(git diff -z --name-only --diff-filter=AMR "origin/$BASE_REF...HEAD" -- manifests)
+          exit "$status"
 
-  # Judges plugin and theme manifests. This job runs no code from the pull request: no
+  # Judges plugin, theme and kit manifests. This job runs no code from the pull request: no
   # tests, no PR-head scripts. The validators and policy/ come from the base branch.
   judge:
     runs-on: ubuntu-latest
@@ -78,25 +96,34 @@ jobs:
           trap 'rm -rf "$work"' EXIT
           # 1. What to judge: the changed manifests (type changes included, deletions not),
           # plus every tracked plugin manifest when policy/ or manifests/themes/ changed.
-          # Changed themes are judged on their own; the sweep stays plugin-only.
+          # Changed themes and kits are judged on their own; the sweep also re-checks every tracked kit.
           # Deletions count for the sweep. Both lists are written first so a git failure stops the job.
           git diff -z --name-only --diff-filter=AMRT "origin/$BASE_REF...HEAD" -- manifests > "$work/changed"
           git diff -z --name-only "origin/$BASE_REF...HEAD" -- policy manifests/themes > "$work/sweepers"
           sweep=0
+          kitsweep=()
           if [ -s "$work/sweepers" ]; then
             sweep=1
-            git ls-files -z -- 'manifests/*.json' ':(exclude)manifests/themes/*' > "$work/tracked"
+            git ls-files -z -- 'manifests/*.json' ':(exclude)manifests/themes/*' ':(exclude)manifests/kits/*' > "$work/tracked"
+            # Kits are re-checked offline (no --remote, no fetch) against the BASE policy, so a kit that an earlier policy change broke is flagged.
+            # Known gap: the PR that newly reserves an existing kit's name is not caught (it is judged with the base policy); reviewers must check manifests/kits/.
+            git ls-files -z -- 'manifests/kits/*.json' > "$work/kits"
+            while IFS= read -r -d '' k; do
+              case "$k" in manifests/kits/*/*) ;; *) kitsweep+=("$k") ;; esac
+            done < "$work/kits"
           else
             : > "$work/tracked"
           fi
           files=()
           themes=()
+          kits=()
           declare -A seen=()
           while IFS= read -r -d '' f; do
             if [ -n "${seen[$f]:-}" ]; then continue; fi
             seen[$f]=1
             case "$f" in
-              manifests/README.md | manifests/schema.json | manifests/themes/README.md) continue ;;
+              manifests/README.md | manifests/schema.json | manifests/themes/README.md | manifests/kits/README.md) continue ;;
+              manifests/kits/*/*) echo "$f: kit manifests must be manifests/kits/<name>.json, no nested paths" >&2; status=1; continue ;;
               manifests/themes/*/*) echo "$f: theme manifests must be manifests/themes/<name>.json, no nested paths" >&2; status=1; continue ;;
               manifests/themes/*.json)
                 base=${f#manifests/themes/}; base=${base%.json}
@@ -110,6 +137,19 @@ jobs:
                   status=1; continue
                 fi
                 themes+=("$f"); continue ;;
+              manifests/kits/*.json)
+                base=${f#manifests/kits/}; base=${base%.json}
+                if ! [[ $base =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
+                  echo "$f: file name must be <name>.json with a valid kit name" >&2
+                  status=1; continue
+                fi
+                mode=$(git ls-files -s -- "$f" | cut -d' ' -f1)
+                if [ -L "$f" ] || [ "$mode" != 100644 ]; then
+                  echo "$f: a manifest must be a regular file, not a symlink or other type" >&2
+                  status=1; continue
+                fi
+                kits+=("$f"); continue ;;
+              manifests/kits/*) echo "$f: only manifests/kits/<name>.json files are allowed here" >&2; status=1; continue ;;
               manifests/*.json) ;;
               manifests) echo "manifests must be a directory, not a symlink or a file" >&2; status=1; continue ;;
               manifests/*) echo "$f: only manifests/<name>.json files are allowed here" >&2; status=1; continue ;;
@@ -127,11 +167,11 @@ jobs:
             fi
             files+=("$f")
           done < <(cat "$work/changed" "$work/tracked")
-          if [ "${#files[@]}" -eq 0 ] && [ "${#themes[@]}" -eq 0 ]; then
-            echo "judge: no plugin or theme manifests, policy or themes changed; nothing to judge"
+          if [ "${#files[@]}" -eq 0 ] && [ "${#themes[@]}" -eq 0 ] && [ "${#kits[@]}" -eq 0 ] && [ "${#kitsweep[@]}" -eq 0 ]; then
+            echo "judge: no plugin, theme or kit manifests, policy or themes changed; nothing to judge"
             exit "$status"
           fi
-          if [ "$sweep" -eq 1 ]; then echo "judge: policy or themes changed; judging every plugin manifest"; fi
+          if [ "$sweep" -eq 1 ]; then echo "judge: policy or themes changed; judging every plugin manifest and re-checking kit manifests offline"; fi
           # 2. Copy the validator and policy from the base branch, once. Any failure stops the job.
           trusted="$work/trusted"
           mkdir -p "$trusted/scripts" "$trusted/policy"
@@ -151,6 +191,12 @@ jobs:
               exit 1
             fi
           fi
+          if [ "${#kits[@]}" -gt 0 ] || [ "${#kitsweep[@]}" -gt 0 ]; then
+            if ! git show "origin/$BASE_REF:scripts/validate-kit-manifest.sh" > "$trusted/scripts/validate-kit-manifest.sh"; then
+              echo "the base branch has no validator to judge kit manifests" >&2
+              exit 1
+            fi
+          fi
           # 3. Judge. Validators run on the checkout path so they see the sibling
           # manifests; only the validator script itself is the trusted base copy.
           for f in ${files[@]+"${files[@]}"}; do
@@ -158,6 +204,12 @@ jobs:
           done
           for f in ${themes[@]+"${themes[@]}"}; do
             bash "$trusted/scripts/validate-theme-manifest.sh" "$f" --remote || status=1
+          done
+          for f in ${kits[@]+"${kits[@]}"}; do
+            bash "$trusted/scripts/validate-kit-manifest.sh" "$f" --remote || status=1
+          done
+          for f in ${kitsweep[@]+"${kitsweep[@]}"}; do
+            bash "$trusted/scripts/validate-kit-manifest.sh" "$f" || status=1
           done
           exit "$status"
 
@@ -186,6 +238,7 @@ jobs:
           while IFS= read -r -d '' f; do
             case "$f" in
               manifests/README.md | manifests/schema.json | manifests/themes/README.md | manifests/themes/*.json) continue ;;
+              manifests/kits/README.md | manifests/kits/*) continue ;;
               manifests/*.json) ;;
               manifests) echo "manifests must be a directory, not a symlink or a file" >&2; exit 1 ;;
               manifests/*) echo "$f: only manifests/<name>.json files are allowed here" >&2; exit 1 ;;

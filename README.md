@@ -25,12 +25,14 @@ click from the Hatamoto admin.
 - [CONTRIBUTING.md](CONTRIBUTING.md) and [CONTRIBUTING-THEMES.md](CONTRIBUTING-THEMES.md): how maintainers add, update and remove a first-party listing.
 - [manifests/README.md](manifests/README.md) and [manifests/schema.json](manifests/schema.json): the plugin manifest format.
 - [manifests/themes/README.md](manifests/themes/README.md) and [schemas/theme-manifest.schema.json](schemas/theme-manifest.schema.json): the theme manifest format.
+- [manifests/kits/README.md](manifests/kits/README.md) and [schemas/kit-manifest.schema.json](schemas/kit-manifest.schema.json): the kit manifest format (first-party kits only).
 
 ## Checks
 
 Every pull request runs `.github/workflows/validate.yml`, so its required `judge` check always reports.
 `judge` validates the plugin manifests a pull request changes, using the validator and `policy/` of the
-base branch. When a pull request changes `policy/` or `manifests/themes/`, it re-judges every plugin
+base branch; a changed first-party kit manifest (`manifests/kits/`) is judged with the kit validator of the
+base branch. When a pull request changes `policy/` or `manifests/themes/`, it re-judges every plugin and kit
 manifest with the base rules. The Hatamoto registry build for plugins (`registry/build-community.sh`
 in the Hatamoto core repository) reads `policy/` from a checkout of this repository; a missing,
 unreadable or empty list stops the build, so a bad policy change breaks publishing, not just PR
@@ -40,10 +42,12 @@ manifest without a tier and does not check the owner of a theme.
 Run the same checks locally:
 
 ```sh
-bash tests/run.sh                         # validator self-test (includes run-themes.sh)
+bash tests/run.sh                         # validator self-test (includes run-themes.sh and run-kits.sh)
 bash tests/run-themes.sh                  # theme validator self-test only
+bash tests/run-kits.sh                    # kit validator self-test only
 scripts/validate-manifest.sh manifests/gtm.json --remote
 scripts/validate-theme-manifest.sh manifests/themes/hanshi.json --remote
+scripts/validate-kit-manifest.sh manifests/kits/<name>.json --remote
 ```
 
 ## Maintainer setup for the mirror

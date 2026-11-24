@@ -1,0 +1,352 @@
+#!/usr/bin/env bash
+# Validate one kit manifest. Usage: validate-kit-manifest.sh <manifests/kits/name.json> [--remote]
+#
+# The rules mirror schemas/kit-manifest.schema.json and the registry build
+# (registry/build-community-kits.sh in the Hatamoto core repo); keep them in sync.
+# This repository lists first-party kits only: the source must be a git repo owned by a
+# first-party owner. The core kit build does not check the owner, the look-alikes or the
+# name "default" (this validator is stricter); a matching core change is tracked separately.
+# A kit may share its name with a plugin or a theme (the registry key is kind plus name), so
+# there is no cross-kind check; look-alikes are checked against sibling kits and reserved
+# names only. The optional about and features keys follow check_about_features there.
+# Reserved names come from ../policy/reserved-names.txt next to this script; a missing,
+# unreadable or empty list rejects.
+# --remote (CI) also fetches the pinned commit and checks that <subdir>/kit.json carries the
+# manifest name and kit format 1. If HATAMOTO_BIN is set, the Go validator (`kit check`, which
+# has no registry mode) also runs; its exit status decides, its note: lines are not failures.
+# Manifest values are only ever passed as quoted arguments, never evaluated.
+set -euo pipefail
+# Title length counts characters, not bytes.
+if locale -a 2>/dev/null | grep -qix 'C\.utf-\?8'; then
+  export LC_ALL=C.UTF-8
+elif loc=$(locale -a 2>/dev/null | grep -iE '^en_US\.utf-?8$' | head -n1) && [ -n "$loc" ]; then
+  export LC_ALL=$loc
+elif loc=$(locale -a 2>/dev/null | grep -iE '\.utf-?8$' | head -n1) && [ -n "$loc" ]; then
+  export LC_ALL=$loc
+else
+  echo "warning: no UTF-8 locale found; title length may be counted in bytes" >&2
+fi
+
+# License allowlist (SPDX ids); keep in sync with scripts/validate-manifest.sh,
+# manifests/schema.json and the registry build script (tests/run-kits.sh
+# asserts this array equals the one in validate-manifest.sh and validate-theme-manifest.sh).
+# keep in sync with scripts/validate-theme-manifest.sh and core registry/build-community-kits.sh
+licenses=(MIT Apache-2.0 BSD-2-Clause BSD-3-Clause ISC MPL-2.0)
+for l in GPL-2.0 GPL-3.0 LGPL-2.1 LGPL-3.0 AGPL-3.0; do
+  licenses+=("$l" "$l-only" "$l-or-later")
+done
+
+# Owners whose repos may hold a listed kit (space separated, lowercase, compared
+# case-insensitively against the exact repo owner); keep in sync with FIRST_PARTY_OWNERS in
+# scripts/validate-manifest.sh and with schemas/kit-manifest.schema.json.
+# keep in sync with scripts/validate-theme-manifest.sh and core registry/build-community-kits.sh
+FIRST_PARTY_OWNERS="zenlabscorp zen-labs-corp"
+portal=https://hatamoto.dev/developers
+
+# host_ok <url>: public DNS name only. No IP literal, localhost, single label,
+# internal suffix, port or credentials. Keep in sync with the registry build script.
+host_ok() {
+  local h=${1#https://}
+  h=${h%%/*}
+  h=$(printf '%s' "$h" | tr '[:upper:]' '[:lower:]')
+  case $h in
+    ''|*@*|*:*|*\[*|*\]*) return 1 ;;
+    localhost|*.localhost|*.local|*.internal|*.lan|*.home|*.corp|*.test|*.invalid) return 1 ;;
+  esac
+  [[ $h =~ ^[0-9.]+$ ]] && return 1
+  [[ $h == *.* ]] || return 1
+  return 0
+}
+
+usage() { echo "usage: $0 <manifest.json> [--remote]" >&2; exit 2; }
+
+[ $# -ge 1 ] && [ $# -le 2 ] || usage
+file=$1
+remote=0
+if [ $# -eq 2 ]; then
+  [ "$2" = "--remote" ] || usage
+  remote=1
+fi
+
+fail=0
+bad() { echo "$file: $1" >&2; fail=1; }
+
+[ -f "$file" ] || { echo "$file: no such file" >&2; exit 1; }
+if ! jq -e 'type == "object"' "$file" >/dev/null 2>&1; then
+  echo "$file: not a JSON object" >&2
+  exit 1
+fi
+
+# Reserved names come from policy/reserved-names.txt next to this script's scripts/ dir.
+# Fail closed, before any name check and before any network access.
+# keep in sync with Hatamoto core registry/build-community-kits.sh
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+pol=$here/../policy
+if [ ! -r "$pol/reserved-names.txt" ]; then bad "missing policy: reserved-names.txt"; exit 1; fi
+# plist <list>: entries, trimmed and lowercased, without blank lines and "# " comments.
+plist() {
+  jq -Rr 'ascii_downcase | gsub("\r"; "") | gsub("^\\s+|\\s+$"; "") | select(. != "" and . != "#" and (startswith("# ") | not))' "$pol/$1.txt"
+}
+reserved_names=$(plist reserved-names)
+[ -n "$reserved_names" ] || { bad "empty policy: reserved-names.txt"; exit 1; }
+# inlist <newline separated list> <word>: exact whole-line membership.
+inlist() { [[ $'\n'$1$'\n' == *$'\n'"$2"$'\n'* ]]; }
+# lev1 <a> <b>: edit distance of at most 1.
+# keep in sync with scripts/validate-manifest.sh and Hatamoto core registry/build-community.sh
+lev1() {
+  local a=$1 b=$2 i=0
+  [ "$a" = "$b" ] && return 0
+  while [ "$i" -lt "${#a}" ] && [ "$i" -lt "${#b}" ] && [ "${a:i:1}" = "${b:i:1}" ]; do i=$((i + 1)); done
+  a=${a:i}; b=${b:i}
+  while [ -n "$a" ] && [ -n "$b" ] && [ "${a: -1}" = "${b: -1}" ]; do a=${a%?}; b=${b%?}; done
+  [ "${#a}" -le 1 ] && [ "${#b}" -le 1 ]
+}
+# lkey <name>: hyphens removed, 0 1 3 5 folded to o l e s.
+# keep in sync with scripts/validate-manifest.sh and Hatamoto core registry/build-community.sh
+lkey() { printf '%s' "$1" | tr -d '-' | tr '0135' 'oles'; }
+
+# Emoji, symbols and invisible characters; the filter is a copy of the one in
+# scripts/validate-manifest.sh (it explains each class). An oniguruma without a property makes
+# jq fail and the check reject.
+# keep in sync with scripts/validate-manifest.sh (unsafe_chars_filter)
+unsafe_chars_filter='$t | test("\\p{Cf}|\\p{Co}|\\p{Cs}|\\p{So}|\\p{Sk}|\\p{Extended_Pictographic}|\\p{Emoji_Presentation}|\\p{Default_Ignorable_Code_Point}|(?![\u0640\u3005\u3031-\u3035\u303B\u309D\u309E\u30FC-\u30FE])\\p{Lm}")'
+
+# check_about_features: the rules for the optional keys "about" (plain text, paragraphs
+# separated by one newline) and "features" (a list of short lines). jq reads the manifest file
+# itself (not through field, which drops NULs and trailing newlines); the only program text
+# spliced in is the script's own filter constant. A jq failure rejects.
+# keep in sync with scripts/validate-theme-manifest.sh and core registry/build-community-kits.sh
+# (check_about_features); the body is byte-equal to the theme validator's
+check_about_features() {
+  local r line
+  r=$(jq -r '
+    def unsafe: '"${unsafe_chars_filter#\$t | }"';
+    def line_problem:
+      if test("[<>]") then "must not contain < or >"
+      elif (ascii_downcase | contains("://") or contains("www.")) then "must not contain a URL"
+      elif . != gsub("^\\s+|\\s+$"; "") then "must not start or end with whitespace"
+      elif unsafe then "must not contain emoji, symbols or invisible characters"
+      else empty end;
+    def has_control($keep): explode | any(. != $keep and (. < 32 or (. >= 127 and . <= 159)));
+    (if has("about") then
+      .about as $a
+      | if ($a | type) != "string" then "about must be a string"
+        elif ($a | length) < 1 or ($a | length) > 1500 then "about must be 1 to 1500 characters"
+        elif ($a | has_control(10)) then "about must not contain control characters other than a newline between paragraphs"
+        elif ($a | split("\n") | length) > 10 then "about must have at most 10 paragraphs"
+        elif ($a | split("\n") | any(. == "")) then "about must not have an empty paragraph"
+        else ($a | split("\n") | map(line_problem) | first) as $p | if $p then "about \($p)" else empty end end
+    else empty end),
+    (if has("features") then
+      .features as $l
+      | if ($l | type) != "array" or ($l | any(type != "string")) then "features must be a list of strings"
+        elif ($l | length) < 1 or ($l | length) > 8 then "features must list 1 to 8 items"
+        elif ($l | any(length < 1 or length > 120)) then "each feature must be 1 to 120 characters"
+        elif ($l | any(has_control(-1))) then "a feature must not contain control characters"
+        else ($l | map(line_problem) | first) as $p
+          | if $p then "a feature \($p)"
+            elif ($l | map(ascii_downcase) | unique | length) != ($l | length) then "features must not repeat an item"
+            else empty end end
+    else empty end)' "$file") || { bad "about and features could not be checked"; return; }
+  while IFS= read -r line; do
+    [ -z "$line" ] || bad "$line"
+  done <<<"$r"
+}
+
+field() { jq -r --arg k "$1" 'if (.[$k] | type) == "string" then .[$k] else "" end' "$file"; }
+has() { jq -e --arg k "$1" 'has($k)' "$file" >/dev/null; }
+
+extra=$(jq -r '[keys[] | select(IN("name","author","license","homepage","subdir","repo","commit","archive","sha256","title","archive_grant","about","features") | not)] | join(", ")' "$file")
+[ -z "$extra" ] || bad "unknown field(s): $extra"
+
+for k in name author license archive_grant; do
+  has "$k" || bad "missing required field: $k"
+done
+for k in name author license title homepage subdir repo commit archive sha256; do
+  if has "$k" && ! jq -e --arg k "$k" '.[$k] | type == "string"' "$file" >/dev/null; then
+    bad "$k must be a string"
+  fi
+done
+
+# The grant must be the JSON value true, nothing else.
+if has archive_grant && ! jq -e '.archive_grant == true' "$file" >/dev/null; then
+  bad "archive_grant must be true"
+fi
+
+name=$(field name)
+author=$(field author)
+license=$(field license)
+homepage=$(field homepage)
+subdir=$(field subdir)
+repo=$(field repo)
+commit=$(field commit)
+archive=$(field archive)
+sha256=$(field sha256)
+title=$(field title)
+
+url_re='^https://([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}/[^[:space:]@]+$'
+# file:// sources exist only for the offline tests (same hooks as the mirror and the builder).
+repo_ok() { { [[ $1 =~ $url_re ]] && host_ok "$1"; } || { [ "${HATAMOTO_ALLOW_FILE_REPOS:-}" = 1 ] && [[ $1 =~ ^file:///[A-Za-z0-9._/-]+$ ]]; }; }
+archive_ok() { { [[ $1 =~ $url_re ]] && host_ok "$1"; } || { [ "${HATAMOTO_ALLOW_FILE_ARCHIVES:-}" = 1 ] && [[ $1 =~ ^file:///[A-Za-z0-9._/-]+\.zip$ ]]; }; }
+
+if has name && ! [[ $name =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
+  bad "name must match ^[a-z][a-z0-9-]{1,39}\$"
+fi
+if has name; then
+  # keep in sync with Hatamoto core registry/build-community-kits.sh
+  for reserved in default webhooks hello gtm searchconsole; do
+    [ "$name" != "$reserved" ] || bad "name \"$name\" is reserved"
+  done
+  if inlist "$reserved_names" "$name" && ! [[ $name =~ ^(default|webhooks|hello|gtm|searchconsole)$ ]]; then
+    bad "name \"$name\" is reserved"
+  fi
+fi
+base=$(basename "$file" .json)
+if has name && [ "$name" != "$base" ]; then
+  bad "name \"$name\" must equal the file name \"$base\""
+fi
+if has author && ! [[ $author =~ ^[A-Za-z0-9][A-Za-z0-9\ ._@-]{0,60}$ ]]; then
+  bad "author must match ^[A-Za-z0-9][A-Za-z0-9 ._@-]{0,60}\$"
+fi
+if has license; then
+  allowed=0
+  for l in "${licenses[@]}"; do
+    if [ "$license" = "$l" ]; then allowed=1; fi
+  done
+  if [ "$allowed" -eq 0 ]; then
+    bad "license must be one of: ${licenses[*]}"
+  fi
+fi
+if has title; then
+  if [ -z "$title" ] || [ "${#title}" -gt 60 ] || [[ $title =~ [[:cntrl:]] ]] || [[ $title == " "* ]] || [[ $title == *" " ]]; then
+    bad "title must be 1 to 60 characters, no control characters, no leading or trailing space"
+  fi
+fi
+if has homepage && ! [[ $homepage =~ ^https:// ]]; then
+  bad "homepage must start with https://"
+fi
+if has subdir; then
+  if ! [[ $subdir =~ ^[A-Za-z0-9._/-]+$ ]] || [[ $subdir == /* ]] || [[ $subdir =~ (^|/)\.{1,2}(/|$) ]] || [[ $subdir == *//* ]]; then
+    bad "subdir must use only A-Za-z0-9._/- with no leading / and no . or .. segment and no //"
+  fi
+fi
+
+# Exactly one source.
+git_src=0; arc_src=0
+{ has repo || has commit; } && git_src=1
+{ has archive || has sha256; } && arc_src=1
+if [ "$git_src" -eq 1 ] && [ "$arc_src" -eq 1 ]; then
+  bad "use either repo+commit or archive+sha256, not both"
+elif [ "$git_src" -eq 0 ] && [ "$arc_src" -eq 0 ]; then
+  bad "missing source: give repo+commit or archive+sha256"
+elif [ "$git_src" -eq 1 ]; then
+  has repo || bad "missing required field: repo"
+  has commit || bad "missing required field: commit"
+  if has repo && ! repo_ok "$repo"; then
+    bad "repo must be an https:// URL on a public host name (no IP, localhost, port or credentials)"
+  fi
+  if has commit && ! [[ $commit =~ ^[0-9a-f]{40}$ ]]; then
+    bad "commit must be 40 lowercase hex characters"
+  fi
+else
+  has archive || bad "missing required field: archive"
+  has sha256 || bad "missing required field: sha256"
+  has subdir && bad "subdir is not allowed with an archive source"
+  if has archive && ! archive_ok "$archive"; then
+    bad "archive must be an https:// URL on a public host name (no IP, localhost, port or credentials)"
+  fi
+  if has sha256 && ! [[ $sha256 =~ ^[a-f0-9]{64}$ ]]; then
+    bad "sha256 must be 64 lowercase hex characters"
+  fi
+fi
+
+# First-party only: a git source whose repo owner is on the allowlist. An archive has no
+# provable owner, so remote archives are never fetched. A file:/// repo (offline tests only)
+# uses its parent directory as the owner.
+if [ "$arc_src" -eq 1 ] && [ "$git_src" -eq 0 ]; then
+  bad "archive sources are not listed here; this repository lists first-party kits only, outside authors publish at $portal"
+elif [ "$git_src" -eq 1 ] && [ "$arc_src" -eq 0 ] && has repo; then
+  owner=""
+  if [[ $repo =~ ^https://github\.com/([A-Za-z0-9._-]+)/[A-Za-z0-9._-]+$ ]]; then
+    owner=${BASH_REMATCH[1]}
+  elif [[ $repo =~ ^file:///([A-Za-z0-9._/-]+)/[A-Za-z0-9._-]+$ ]]; then
+    owner=${BASH_REMATCH[1]##*/}
+  fi
+  owner=$(printf '%s' "$owner" | tr '[:upper:]' '[:lower:]')
+  owner_ok=0
+  for o in $FIRST_PARTY_OWNERS; do
+    if [ -n "$owner" ] && [ "$owner" = "$o" ]; then owner_ok=1; fi
+  done
+  [ "$owner_ok" -eq 1 ] || bad "repo must be https://github.com/<owner>/<repo> with owner one of: $FIRST_PARTY_OWNERS; this repository lists first-party kits only, outside authors publish at $portal"
+fi
+
+# Look-alikes of reserved names always, and of sibling kits when the file sits in
+# <root>/manifests/kits/. Plugins and themes are not compared: a kit may share their names.
+# Same filters and message as scripts/validate-manifest.sh.
+dir=$(cd "$(dirname "$file")" && pwd)
+if has name && [[ $name =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then
+  nkey=$(lkey "$name")
+  look() { # look <other name>
+    [ "$1" != "$name" ] || return 0
+    if [ "$(lkey "$1")" = "$nkey" ] || lev1 "$name" "$1"; then bad "name \"$name\" looks like \"$1\""; fi
+  }
+  if [ "$(basename "$dir")" = "kits" ] && [ "$(basename "$(dirname "$dir")")" = "manifests" ]; then
+    for other in "$dir"/*.json; do
+      [ -e "$other" ] || continue
+      oname=$(basename "$other" .json)
+      [ "$oname" != "$base" ] || continue
+      [[ $oname =~ ^[a-z][a-z0-9-]{1,39}$ ]] || continue
+      look "$oname"
+    done
+  fi
+  for r in default webhooks hello gtm searchconsole; do look "$r"; done
+  while read -r r; do
+    if [[ $r =~ ^[a-z][a-z0-9-]{1,39}$ ]]; then look "$r"; fi
+  done <<<"$reserved_names"
+fi
+
+check_about_features
+
+# Stop before touching the network if the manifest is not well formed.
+[ "$fail" -eq 0 ] || exit 1
+
+if [ "$remote" -eq 1 ]; then
+  export GIT_TERMINAL_PROMPT=0
+  # keep in sync with core registry/build-community-kits.sh (git_opts)
+  git_opts=(-c core.hooksPath=/dev/null -c submodule.recurse=false -c protocol.allow=never -c protocol.https.allow=always)
+  [ "${HATAMOTO_ALLOW_FILE_REPOS:-}" = 1 ] && git_opts+=(-c protocol.file.allow=always)
+  tmp=$(mktemp -d)
+  trap 'rm -rf "$tmp"' EXIT
+  co="$tmp/co"
+  mkdir "$co"
+  git "${git_opts[@]}" -C "$co" init -q
+  if ! git "${git_opts[@]}" -C "$co" fetch -q --depth 1 --no-recurse-submodules "$repo" "$commit" 2>/dev/null; then
+    echo "$file: commit $commit not found in $repo" >&2
+    exit 1
+  fi
+  prefix=""
+  [ -z "$subdir" ] || prefix="${subdir%/}/"
+  if ! kj=$(git "${git_opts[@]}" -C "$co" show "FETCH_HEAD:${prefix}kit.json" 2>/dev/null); then
+    echo "$file: no ${prefix}kit.json at commit $commit" >&2
+    exit 1
+  fi
+  if ! printf '%s' "$kj" | jq -e 'type == "object"' >/dev/null 2>&1; then
+    echo "$file: ${prefix}kit.json is not a JSON object" >&2
+    exit 1
+  fi
+  kname=$(printf '%s' "$kj" | jq -r '.name // empty' 2>/dev/null || true)
+  if [ "$kname" != "$name" ]; then
+    echo "$file: kit.json name \"$kname\" does not match manifest name \"$name\"" >&2
+    exit 1
+  fi
+  if ! printf '%s' "$kj" | jq -e '.kit == 1' >/dev/null 2>&1; then
+    echo "$file: kit.json kit must be 1 (kit format version 1)" >&2
+    exit 1
+  fi
+  if [ -n "${HATAMOTO_BIN:-}" ]; then
+    git "${git_opts[@]}" -C "$co" checkout -q --no-recurse-submodules FETCH_HEAD
+    "$HATAMOTO_BIN" kit check "$co/${subdir%/}" --expect-name "$name"
+  fi
+fi
+
+echo "$file: ok"

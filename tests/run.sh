@@ -555,7 +555,7 @@ rd reject "banned word #1" '"Adds a contact page, rated #1 by users"' 'banned wo
 # validate.yml: the judge job runs no pull request code and fails closed.
 wf=.github/workflows/validate.yml
 judge=$(awk '/^  judge:/{on=1;print;next} on && /^  [a-z]+:/{exit} on{print}' "$wf")
-if [ -n "$judge" ] && ! grep -Eq 'tests/|scripts/validate-(theme-)?manifest\.sh "\$f"|scripts/check' <<<"$judge"; then ok "judge job runs no pull request code"; else no "judge job runs no pull request code"; fi
+if [ -n "$judge" ] && ! grep -Eq 'tests/|scripts/validate-(theme-|kit-)?manifest\.sh "\$f"|scripts/check' <<<"$judge"; then ok "judge job runs no pull request code"; else no "judge job runs no pull request code"; fi
 if grep -q 'diff-filter=AMRT' <<<"$judge" && grep -q '100644' <<<"$judge"; then ok "judge job lists type changes and requires regular files"; else no "judge job lists type changes and requires regular files"; fi
 if grep -q 'exit 1' <<<"$judge" && ! grep -q 'fetch_trusted\|return 1\|return 0' <<<"$judge"; then ok "judge job stops when a base file is missing"; else no "judge job stops when a base file is missing"; fi
 # The workflow runs on every pull request, so the required judge check always reports.
@@ -598,19 +598,28 @@ fi
 repo=$PWD
 cm() { (cd "$tmp/cm" && "$repo/scripts/changed-manifests.sh" "$@" | tr '\0' ' '); }
 cg() { git -C "$tmp/cm" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false "$@"; }
-git init -q "$tmp/cm"; mkdir -p "$tmp/cm/manifests/themes" "$tmp/cm/manifests/sub"
+git init -q "$tmp/cm"; mkdir -p "$tmp/cm/manifests/themes" "$tmp/cm/manifests/kits" "$tmp/cm/manifests/sub"
 for n in acme-seo keep gone; do jq --arg n "$n" '.name = $n' "$f/good.json" >"$tmp/cm/manifests/$n.json"; done
-for p in schema.json themes/t.json sub/x.json; do echo '{}' >"$tmp/cm/manifests/$p"; done
+for p in schema.json themes/t.json kits/k.json kits/README.md sub/x.json; do echo '{}' >"$tmp/cm/manifests/$p"; done
 cg add -A; cg commit -qm one
 cg mv manifests/acme-seo.json manifests/acme-seo-pro.json
 jq '.name = "acme-seo-pro"' "$tmp/cm/manifests/acme-seo-pro.json" >"$tmp/x" && mv "$tmp/x" "$tmp/cm/manifests/acme-seo-pro.json"
 cg rm -q manifests/gone.json
-echo '{"a":1}' >"$tmp/cm/manifests/schema.json"; echo '{"a":1}' >"$tmp/cm/manifests/themes/t.json"
+echo '{"a":1}' >"$tmp/cm/manifests/schema.json"; echo '{"a":1}' >"$tmp/cm/manifests/themes/t.json"; echo '{"a":1}' >"$tmp/cm/manifests/kits/k.json"
 jq '.title = "Changed"' "$tmp/cm/manifests/keep.json" >"$tmp/x" && mv "$tmp/x" "$tmp/cm/manifests/keep.json"
 cg add -A; cg commit -qm two
 want="manifests/acme-seo-pro.json manifests/keep.json "
-if [ "$(cm HEAD~1 HEAD)" = "$want" ]; then ok "changed manifests: rename mirrored, delete/schema/themes skipped"; else no "changed manifests: $(cm HEAD~1 HEAD)"; fi
-if [ "$(cm)" = "$want" ]; then ok "all manifests: schema, themes, nested skipped"; else no "all manifests: $(cm)"; fi
+if [ "$(cm HEAD~1 HEAD)" = "$want" ]; then ok "changed manifests: rename mirrored, delete/schema/themes/kits skipped"; else no "changed manifests: $(cm HEAD~1 HEAD)"; fi
+if [ "$(cm)" = "$want" ]; then ok "all manifests: schema, themes, kits, nested skipped"; else no "all manifests: $(cm)"; fi
+
+# A kit may share a name with a plugin and a theme: each validator accepts its own file.
+mkdir -p "$tmp/co/manifests/themes" "$tmp/co/manifests/kits"
+jq '.name = "hn"' "$f/good.json" >"$tmp/co/manifests/hn.json"
+jq '.name = "hn-classic"' tests/fixtures/themes/good-git-github.json >"$tmp/co/manifests/themes/hn-classic.json"
+jq '.name = "hn"' tests/fixtures/kits/good-git-github.json >"$tmp/co/manifests/kits/hn.json"
+if scripts/validate-manifest.sh "$tmp/co/manifests/hn.json" >/dev/null 2>&1 \
+  && scripts/validate-theme-manifest.sh "$tmp/co/manifests/themes/hn-classic.json" >/dev/null 2>&1 \
+  && scripts/validate-kit-manifest.sh "$tmp/co/manifests/kits/hn.json" >/dev/null 2>&1; then ok "kit named like a plugin accepted beside plugin and theme"; else no "kit named like a plugin accepted beside plugin and theme"; fi
 
 # scripts/mirror-rulesets.sh: payloads of the repository rulesets.
 r=scripts/mirror-rulesets.sh
@@ -632,6 +641,10 @@ esac
 
 # tests/run-themes.sh: theme manifest validator tests (a failure here fails this suite).
 if bash tests/run-themes.sh; then ok "run-themes.sh tests"; else no "run-themes.sh tests"; fi
+
+# tests/run-kits.sh and tests/ci-kits.sh: kit validator tests and the workflow replay on kit pull requests.
+if bash tests/run-kits.sh; then ok "run-kits.sh tests"; else no "run-kits.sh tests"; fi
+if bash tests/ci-kits.sh; then ok "ci-kits.sh tests"; else no "ci-kits.sh tests"; fi
 
 echo "$pass passed, $failed failed"
 [ "$failed" -eq 0 ]

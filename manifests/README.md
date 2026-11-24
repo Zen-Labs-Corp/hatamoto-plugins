@@ -6,7 +6,8 @@ a manifest without `tier: first-party`, or from another owner, is refused. Outsi
 authors publish at https://hatamoto.dev/developers.
 
 Themes live in [themes/](themes/README.md), one `manifests/themes/<name>.json` each,
-with their own format and checks.
+with their own format and checks. Kits live in [kits/](kits/README.md), one
+`manifests/kits/<name>.json` each, likewise.
 
 ```json
 {
