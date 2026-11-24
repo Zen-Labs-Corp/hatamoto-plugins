@@ -96,12 +96,20 @@ d=$(newrepo bad); branch "$d"
 kit_manifest "$src" '. + {tier:"first-party"}' > "$d/manifests/kits/community.json"; commit_pr "$d"
 run_block "$d" judge; expect "judge: bad kit pull request" 1 "unknown field(s): tier"
 
-# 3. A policy change sweeps plugins only: a kit already on the base is not judged or mistaken for a plugin.
+# 3. A policy change re-checks kits already on the base, offline and against the base policy
+# (like the plugin sweep): a clean base passes, a base that reserves the kit's name fails.
+# Kits are never mistaken for plugins.
 d=$(newrepo policy)
 kit_manifest "$src" > "$d/manifests/kits/community.json"; commit_pr "$d"
 git -C "$d" update-ref refs/remotes/origin/main HEAD; branch "$d"
 echo "# a comment" >> "$d/policy/reserved-names.txt"; commit_pr "$d"
-run_block "$d" judge; expect "judge: policy change does not list kits" 0 "" "valid plugin name"
+run_block "$d" judge; expect "judge: policy change keeps a clean existing kit" 0 "" "valid plugin name"
+d=$(newrepo policy2)
+echo "community" >> "$d/policy/reserved-names.txt"
+kit_manifest "$src" > "$d/manifests/kits/community.json"; commit_pr "$d"
+git -C "$d" update-ref refs/remotes/origin/main HEAD; branch "$d"
+echo "# a comment" >> "$d/policy/reserved-names.txt"; commit_pr "$d"
+run_block "$d" judge; expect "judge: policy change fails on an existing kit with a reserved name" 1 "is reserved" "valid plugin name"
 
 # 4. Nested kit paths and the README.
 d=$(newrepo nested); branch "$d"

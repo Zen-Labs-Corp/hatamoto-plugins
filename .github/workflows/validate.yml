@@ -10,8 +10,10 @@
 # manifests with the base kit validator (the first-party owner rule lives there). When a pull request changes nothing relevant it prints a note
 # and passes. When it changes policy/ or manifests/themes/ it re-judges every plugin
 # manifest in the repository with the base rules, not only the changed ones; themes are
-# judged only when they change, because each judgement fetches the theme source; kits
-# likewise (a kit change never triggers the sweep). Kits are never built and never mirrored.
+# judged only when they change, because each judgement fetches the theme source. Kits are
+# judged with --remote only when they change; a policy/ change also re-checks every kit
+# manifest offline (no fetch) with the base validator; like the plugin sweep, that checks
+# against the base policy. Kits are never built and never mirrored.
 # The base branch must already carry policy/ and the validators; until it does the job
 # fails closed. A pull request that edits the workflow or scripts is
 # covered by maintainer review, not by this job. The Hatamoto registry build for plugins
@@ -99,9 +101,14 @@ jobs:
           git diff -z --name-only --diff-filter=AMRT "origin/$BASE_REF...HEAD" -- manifests > "$work/changed"
           git diff -z --name-only "origin/$BASE_REF...HEAD" -- policy manifests/themes > "$work/sweepers"
           sweep=0
+          kitsweep=()
           if [ -s "$work/sweepers" ]; then
             sweep=1
             git ls-files -z -- 'manifests/*.json' ':(exclude)manifests/themes/*' ':(exclude)manifests/kits/*' > "$work/tracked"
+            # Kits are re-checked offline (no --remote, no fetch) so a policy/ change cannot leave a kit the registry build refuses.
+            while IFS= read -r -d '' k; do
+              case "$k" in manifests/kits/*/*) ;; *) kitsweep+=("$k") ;; esac
+            done < <(git ls-files -z -- 'manifests/kits/*.json')
           else
             : > "$work/tracked"
           fi
@@ -158,11 +165,11 @@ jobs:
             fi
             files+=("$f")
           done < <(cat "$work/changed" "$work/tracked")
-          if [ "${#files[@]}" -eq 0 ] && [ "${#themes[@]}" -eq 0 ] && [ "${#kits[@]}" -eq 0 ]; then
+          if [ "${#files[@]}" -eq 0 ] && [ "${#themes[@]}" -eq 0 ] && [ "${#kits[@]}" -eq 0 ] && [ "${#kitsweep[@]}" -eq 0 ]; then
             echo "judge: no plugin, theme or kit manifests, policy or themes changed; nothing to judge"
             exit "$status"
           fi
-          if [ "$sweep" -eq 1 ]; then echo "judge: policy or themes changed; judging every plugin manifest"; fi
+          if [ "$sweep" -eq 1 ]; then echo "judge: policy or themes changed; judging every plugin manifest and re-checking kit manifests offline"; fi
           # 2. Copy the validator and policy from the base branch, once. Any failure stops the job.
           trusted="$work/trusted"
           mkdir -p "$trusted/scripts" "$trusted/policy"
@@ -182,7 +189,7 @@ jobs:
               exit 1
             fi
           fi
-          if [ "${#kits[@]}" -gt 0 ]; then
+          if [ "${#kits[@]}" -gt 0 ] || [ "${#kitsweep[@]}" -gt 0 ]; then
             if ! git show "origin/$BASE_REF:scripts/validate-kit-manifest.sh" > "$trusted/scripts/validate-kit-manifest.sh"; then
               echo "the base branch has no validator to judge kit manifests" >&2
               exit 1
@@ -198,6 +205,9 @@ jobs:
           done
           for f in ${kits[@]+"${kits[@]}"}; do
             bash "$trusted/scripts/validate-kit-manifest.sh" "$f" --remote || status=1
+          done
+          for f in ${kitsweep[@]+"${kitsweep[@]}"}; do
+            bash "$trusted/scripts/validate-kit-manifest.sh" "$f" || status=1
           done
           exit "$status"
 
