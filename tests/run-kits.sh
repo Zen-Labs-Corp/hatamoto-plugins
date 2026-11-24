@@ -44,6 +44,10 @@ expect_reject bad-ip-host.json "public host name"
 expect_reject bad-localhost.json "public host name"
 expect_reject bad-port.json "public host name"
 expect_reject bad-subdir.json "subdir must use only"
+expect_reject bad-subdir-dot.json "subdir must use only"
+expect_reject bad-subdir-dot-prefix.json "subdir must use only"
+expect_reject bad-subdir-dot-mid.json "subdir must use only"
+expect_reject bad-subdir-double-slash.json "subdir must use only"
 expect_reject bad-about.json "about must not have an empty paragraph"
 expect_reject bad-features.json "a feature must not contain a URL"
 
@@ -332,7 +336,7 @@ PY
   for g in good-git-github good-about; do
     if sv "$f/$g.json"; then ok "schema accepts $g"; else no "schema accepts $g"; fi
   done
-  for b in bad-http-repo bad-commit bad-sha256 bad-both-sources bad-no-source bad-extra-field bad-no-grant bad-license bad-reserved default bad-host-codeberg bad-owner-github bad-ip-host bad-localhost bad-port bad-subdir bad-archive-source; do
+  for b in bad-http-repo bad-commit bad-sha256 bad-both-sources bad-no-source bad-extra-field bad-no-grant bad-license bad-reserved default bad-host-codeberg bad-owner-github bad-ip-host bad-localhost bad-port bad-subdir bad-subdir-dot bad-subdir-dot-prefix bad-subdir-dot-mid bad-subdir-double-slash bad-archive-source; do
     if sv "$f/$b.json"; then no "schema rejects $b"; else ok "schema rejects $b"; fi
   done
   smut() { # <label> <accept|reject> <jq filter>
@@ -346,6 +350,10 @@ PY
   smut "subdir traversal" reject '. + {subdir: "../x"}'
   smut "subdir mid traversal" reject '. + {subdir: "a/../x"}'
   smut "absolute subdir" reject '. + {subdir: "/abs"}'
+  smut "subdir dot" reject '. + {subdir: "."}'
+  smut "subdir leading dot segment" reject '. + {subdir: "./kits/x"}'
+  smut "subdir mid dot segment" reject '. + {subdir: "kits/./x"}'
+  smut "subdir double slash" reject '. + {subdir: "kits//x"}'
   smut "nested subdir" accept '. + {subdir: "kits/community"}'
   smut "no subdir" accept 'del(.subdir)'
   smut "dotted subdir name" accept '. + {subdir: "a..b/x"}'

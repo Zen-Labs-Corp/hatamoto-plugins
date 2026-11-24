@@ -226,8 +226,8 @@ if has homepage && ! [[ $homepage =~ ^https:// ]]; then
   bad "homepage must start with https://"
 fi
 if has subdir; then
-  if ! [[ $subdir =~ ^[A-Za-z0-9._/-]+$ ]] || [[ $subdir == /* ]] || [[ $subdir =~ (^|/)\.\.(/|$) ]]; then
-    bad "subdir must use only A-Za-z0-9._/- with no leading / and no .."
+  if ! [[ $subdir =~ ^[A-Za-z0-9._/-]+$ ]] || [[ $subdir == /* ]] || [[ $subdir =~ (^|/)\.{1,2}(/|$) ]] || [[ $subdir == *//* ]]; then
+    bad "subdir must use only A-Za-z0-9._/- with no leading / and no . or .. segment and no //"
   fi
 fi
 

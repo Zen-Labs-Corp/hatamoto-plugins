@@ -85,6 +85,8 @@ both "ip host" reject "$(manifest '.repo = "https://192.168.1.5/Zen-Labs-Corp/co
 both "localhost" reject "$(manifest '.repo = "https://localhost/Zen-Labs-Corp/community"')"
 both "port in the host" reject "$(manifest '.repo = "https://github.com:8443/Zen-Labs-Corp/community"')"
 both "subdir traversal" reject "$(manifest '.subdir = "../kits/community"')"
+both "subdir dot" reject "$(manifest '.subdir = "."')"
+both "subdir dot prefix" reject "$(manifest '.subdir = "./kits/community"')"
 both "about with an empty paragraph" reject "$(manifest '. + {about:"line one\n\nline three"}')"
 both "feature with a URL" reject "$(manifest '. + {features:["Visit https://example.com now"]}')"
 both "name differs from the file name" reject "$(manifest .)" other
