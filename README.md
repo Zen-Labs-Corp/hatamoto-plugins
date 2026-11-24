@@ -32,7 +32,7 @@ click from the Hatamoto admin.
 Every pull request runs `.github/workflows/validate.yml`, so its required `judge` check always reports.
 `judge` validates the plugin manifests a pull request changes, using the validator and `policy/` of the
 base branch; a changed first-party kit manifest (`manifests/kits/`) is judged with the kit validator of the
-base branch. When a pull request changes `policy/` or `manifests/themes/`, it re-judges every plugin
+base branch. When a pull request changes `policy/` or `manifests/themes/`, it re-judges every plugin and kit
 manifest with the base rules. The Hatamoto registry build for plugins (`registry/build-community.sh`
 in the Hatamoto core repository) reads `policy/` from a checkout of this repository; a missing,
 unreadable or empty list stops the build, so a bad policy change breaks publishing, not just PR

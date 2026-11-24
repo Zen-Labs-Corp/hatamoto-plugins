@@ -96,7 +96,7 @@ jobs:
           trap 'rm -rf "$work"' EXIT
           # 1. What to judge: the changed manifests (type changes included, deletions not),
           # plus every tracked plugin manifest when policy/ or manifests/themes/ changed.
-          # Changed themes and kits are judged on their own; the sweep stays plugin-only.
+          # Changed themes and kits are judged on their own; the sweep also re-checks every tracked kit.
           # Deletions count for the sweep. Both lists are written first so a git failure stops the job.
           git diff -z --name-only --diff-filter=AMRT "origin/$BASE_REF...HEAD" -- manifests > "$work/changed"
           git diff -z --name-only "origin/$BASE_REF...HEAD" -- policy manifests/themes > "$work/sweepers"
@@ -105,10 +105,12 @@ jobs:
           if [ -s "$work/sweepers" ]; then
             sweep=1
             git ls-files -z -- 'manifests/*.json' ':(exclude)manifests/themes/*' ':(exclude)manifests/kits/*' > "$work/tracked"
-            # Kits are re-checked offline (no --remote, no fetch) so a policy/ change cannot leave a kit the registry build refuses.
+            # Kits are re-checked offline (no --remote, no fetch) against the BASE policy, so a kit that an earlier policy change broke is flagged.
+            # Known gap: the PR that newly reserves an existing kit's name is not caught (it is judged with the base policy); reviewers must check manifests/kits/.
+            git ls-files -z -- 'manifests/kits/*.json' > "$work/kits"
             while IFS= read -r -d '' k; do
               case "$k" in manifests/kits/*/*) ;; *) kitsweep+=("$k") ;; esac
-            done < <(git ls-files -z -- 'manifests/kits/*.json')
+            done < "$work/kits"
           else
             : > "$work/tracked"
           fi

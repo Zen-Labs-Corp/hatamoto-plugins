@@ -147,10 +147,12 @@ A maintainer reads the source at the pinned commit. We look for:
 The `judge` job runs only code from `main`: the validator and `policy/` of `main`, not
 the copies in the change under review. A rule change therefore applies to the next
 change after it merges, and edits to the workflow or scripts are covered by
-maintainer review. Change `policy/` in its own PR. The job reports on every PR; a PR
+maintainer review. Change `policy/` in its own PR, and before reserving a name in
+`policy/reserved-names.txt` check `manifests/`, since the registry build refuses an existing
+kit or plugin with a reserved name and the PR that reserves it is not checked against its own policy. The job reports on every PR; a PR
 that changes `policy/` or `manifests/themes/` makes it re-judge every plugin manifest
-with the rules of `main`. A changed kit manifest (`manifests/kits/`) is judged with the kit
-validator of `main`, and only when it changes.
+and every kit manifest with the rules of `main`. A changed kit manifest (`manifests/kits/`)
+is judged with the kit validator of `main`.
 
 ## After the merge
 
