@@ -11,6 +11,9 @@
 # names only. The optional about and features keys follow check_about_features there.
 # Reserved names come from ../policy/reserved-names.txt next to this script; a missing,
 # unreadable or empty list rejects.
+# --remote (CI) also fetches the pinned commit and checks that <subdir>/kit.json carries the
+# manifest name and kit format 1. If HATAMOTO_BIN is set, the Go validator (`kit check`, which
+# has no registry mode) also runs; its exit status decides, its note: lines are not failures.
 # Manifest values are only ever passed as quoted arguments, never evaluated.
 set -euo pipefail
 # Title length counts characters, not bytes.
@@ -307,6 +310,43 @@ check_about_features
 # Stop before touching the network if the manifest is not well formed.
 [ "$fail" -eq 0 ] || exit 1
 
-[ "$fail" -eq 0 ] || exit 1
+if [ "$remote" -eq 1 ]; then
+  export GIT_TERMINAL_PROMPT=0
+  # keep in sync with core registry/build-community-kits.sh (git_opts)
+  git_opts=(-c core.hooksPath=/dev/null -c submodule.recurse=false -c protocol.allow=never -c protocol.https.allow=always)
+  [ "${HATAMOTO_ALLOW_FILE_REPOS:-}" = 1 ] && git_opts+=(-c protocol.file.allow=always)
+  tmp=$(mktemp -d)
+  trap 'rm -rf "$tmp"' EXIT
+  co="$tmp/co"
+  mkdir "$co"
+  git "${git_opts[@]}" -C "$co" init -q
+  if ! git "${git_opts[@]}" -C "$co" fetch -q --depth 1 --no-recurse-submodules "$repo" "$commit" 2>/dev/null; then
+    echo "$file: commit $commit not found in $repo" >&2
+    exit 1
+  fi
+  prefix=""
+  [ -z "$subdir" ] || prefix="${subdir%/}/"
+  if ! kj=$(git "${git_opts[@]}" -C "$co" show "FETCH_HEAD:${prefix}kit.json" 2>/dev/null); then
+    echo "$file: no ${prefix}kit.json at commit $commit" >&2
+    exit 1
+  fi
+  if ! printf '%s' "$kj" | jq -e 'type == "object"' >/dev/null 2>&1; then
+    echo "$file: ${prefix}kit.json is not a JSON object" >&2
+    exit 1
+  fi
+  kname=$(printf '%s' "$kj" | jq -r '.name // empty' 2>/dev/null || true)
+  if [ "$kname" != "$name" ]; then
+    echo "$file: kit.json name \"$kname\" does not match manifest name \"$name\"" >&2
+    exit 1
+  fi
+  if ! printf '%s' "$kj" | jq -e '.kit == 1' >/dev/null 2>&1; then
+    echo "$file: kit.json kit must be 1 (kit format version 1)" >&2
+    exit 1
+  fi
+  if [ -n "${HATAMOTO_BIN:-}" ]; then
+    git "${git_opts[@]}" -C "$co" checkout -q --no-recurse-submodules FETCH_HEAD
+    "$HATAMOTO_BIN" kit check "$co/${subdir%/}" --expect-name "$name"
+  fi
+fi
 
 echo "$file: ok"
