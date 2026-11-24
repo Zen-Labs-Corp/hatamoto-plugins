@@ -87,7 +87,8 @@ CI rejects a manifest that breaks these rules. The word lists are plain text in
   `webhooks` and `hello` are never accepted; `gtm` and `searchconsole` are accepted
   here and nowhere else. The name may not look like another listing, plugin or theme
   (one character apart, or equal once `-` is removed and `0 1 3 5` are read as
-  `o l e s`), and a plugin and a theme cannot share a name. First-party listings are
+  `o l e s`), and a plugin and a theme cannot share a name (a kit may share a name with a plugin or a
+  theme). First-party listings are
   exempt from the generic reserved names in
   [policy/reserved-names.txt](policy/reserved-names.txt) and from the brand rule
   for names.
@@ -107,7 +108,7 @@ CI rejects a manifest that breaks these rules. The word lists are plain text in
   characters each (no control character, no leading or trailing space; duplicates are
   compared without case). Neither may contain `<`, `>` or a URL (`://`, `www.`), and
   emoji, symbols and invisible characters are refused. Do not put a trailing newline at
-  the end of `about`. The same rules apply to theme manifests.
+  the end of `about`. The same rules apply to theme and kit manifests.
 - **Description** (in `plugin.json`, checked with `--remote`). 20 to 160 characters, at
   most two sentence endings, no URL or domain, only letters, digits, spaces and ASCII
   punctuation (no combining marks, fullwidth forms, emoji or symbols), not the title or
@@ -148,7 +149,8 @@ the copies in the change under review. A rule change therefore applies to the ne
 change after it merges, and edits to the workflow or scripts are covered by
 maintainer review. Change `policy/` in its own PR. The job reports on every PR; a PR
 that changes `policy/` or `manifests/themes/` makes it re-judge every plugin manifest
-with the rules of `main`.
+with the rules of `main`. A changed kit manifest (`manifests/kits/`) is judged with the kit
+validator of `main`, and only when it changes.
 
 ## After the merge
 
