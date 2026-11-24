@@ -250,7 +250,125 @@ if [ -n "$(own "$v")" ] && [ "$(own "$v")" = "$(own scripts/validate-theme-manif
 fn() { sed -n '/^check_about_features() {/,/^}/p' "$1"; }
 if [ -n "$(fn "$v")" ] && [ "$(fn "$v")" = "$(fn scripts/validate-theme-manifest.sh)" ]; then ok "kit sync: check_about_features equals the theme validator's"; else no "kit sync: check_about_features equals the theme validator's"; fi
 
-# --- remote, HATAMOTO_BIN and schema tests are added below (marker for the next step) ---
+# --remote against local sources (offline). The owner is the parent directory of the repo.
+export HATAMOTO_ALLOW_FILE_REPOS=1
+mk_kit_repo() { # <repo dir> <subdir> <kit.json content>
+  mkdir -p "$1/$2"
+  printf '%s' "$3" > "$1/$2/kit.json"
+  git -C "$1" init -q
+  git -C "$1" add -A
+  git -C "$1" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -q -m init
+}
+kj() { # <name> [kit format number]
+  jq -nc --arg n "$1" --argjson k "${2:-1}" '{name:$n,version:"1.0.0",kit:$k,sdk:"^0.27",title:"Community",schemas:[{slug:"story",name:"Stories",schema:{type:"object"}}]}'
+}
+remote_manifest() { # <name> <repo dir> <subdir>: manifest at $tmp/rm/manifests/kits/<name>.json
+  local n=$1 sha
+  sha=$(git -C "$2" rev-parse HEAD)
+  mkdir -p "$tmp/rm/manifests/kits"
+  jq -n --arg n "$n" --arg r "file://$2" --arg c "$sha" --arg s "$3" \
+    '{name:$n,author:"tanaka",license:"MIT",archive_grant:true,repo:$r,commit:$c} + (if $s == "" then {} else {subdir:$s} end)' > "$tmp/rm/manifests/kits/$n.json"
+}
+rm_ok() { "$v" "$tmp/rm/manifests/kits/$1.json" --remote; }
+rm_want() { # <label> <manifest name> <substring>
+  local err
+  if err=$(rm_ok "$2" 2>&1 >/dev/null); then no "$1 (exit 0)"
+  elif [[ $err == *"$3"* ]]; then ok "$1"
+  else no "$1: $err"; fi
+}
+mk_kit_repo "$tmp/$zl/src-good" kits/community "$(kj community)"
+remote_manifest community "$tmp/$zl/src-good" kits/community
+if rm_ok community >/dev/null 2>&1; then ok "remote git accepted"; else no "remote git accepted"; fi
+remote_manifest other "$tmp/$zl/src-good" kits/other
+rm_want "remote missing kit.json rejected" other "no kits/other/kit.json at commit"
+mk_kit_repo "$tmp/$zl/src-rootless" "" "$(kj community)"
+remote_manifest community "$tmp/$zl/src-rootless" ""
+if rm_ok community >/dev/null 2>&1; then ok "remote without subdir accepted"; else no "remote without subdir accepted"; fi
+mk_kit_repo "$tmp/$zl/src-name" kits/community "$(kj starter)"
+remote_manifest community "$tmp/$zl/src-name" kits/community
+rm_want "remote kit.json name mismatch rejected" community "does not match manifest name"
+mk_kit_repo "$tmp/$zl/src-format" kits/community "$(kj community 2)"
+remote_manifest community "$tmp/$zl/src-format" kits/community
+rm_want "remote kit.json format 2 rejected" community "kit must be 1"
+mk_kit_repo "$tmp/$zl/src-array" kits/community '[]'
+remote_manifest community "$tmp/$zl/src-array" kits/community
+rm_want "remote non-object kit.json rejected" community "is not a JSON object"
+remote_manifest community "$tmp/$zl/src-good" kits/community
+jq '.commit = ("0" * 40)' "$tmp/rm/manifests/kits/community.json" > "$tmp/rm/x.json" && mv "$tmp/rm/x.json" "$tmp/rm/manifests/kits/community.json"
+rm_want "remote unknown commit rejected" community "not found in"
+# A non-first-party owner is refused before any fetch.
+mk_kit_repo "$tmp/tanaka/src" kits/community "$(kj community)"
+remote_manifest community "$tmp/tanaka/src" kits/community
+rm_want "remote non-first-party owner rejected" community "first-party kits only"
+# Without the opt-in the file:// repo is refused.
+remote_manifest community "$tmp/$zl/src-good" kits/community
+if err=$(env -u HATAMOTO_ALLOW_FILE_REPOS "$v" "$tmp/rm/manifests/kits/community.json" --remote 2>&1 >/dev/null); then no "file repo without opt-in rejected"
+elif [[ $err == *"repo must be an https://"* ]]; then ok "file repo without opt-in rejected"
+else no "file repo without opt-in: $err"; fi
+
+# The Go-backed validator runs only when HATAMOTO_BIN is set.
+if [ -n "${HATAMOTO_BIN:-}" ]; then
+  remote_manifest community "$tmp/$zl/src-good" kits/community
+  if rm_ok community >/dev/null 2>&1; then ok "kit check accepts a good kit"; else no "kit check accepts a good kit"; fi
+  mk_kit_repo "$tmp/$zl/src-mystery" kits/community "$(kj community | jq -c '.mystery = 1')"
+  remote_manifest community "$tmp/$zl/src-mystery" kits/community
+  if rm_ok community >/dev/null 2>&1; then no "kit check rejects an unknown kit.json key"; else ok "kit check rejects an unknown kit.json key"; fi
+else
+  echo "skip kit check tests: HATAMOTO_BIN not set"
+fi
+unset HATAMOTO_ALLOW_FILE_REPOS
+
+# schemas/kit-manifest.schema.json agrees with the validator. Needs python3 jsonschema;
+# a missing module fails the suite unless SCHEMA_TESTS_ALLOW_SKIP=1.
+if python3 -c 'import jsonschema' >/dev/null 2>&1; then
+  sv() { python3 - "$1" <<'PY'
+import json, sys, jsonschema
+s = json.load(open("schemas/kit-manifest.schema.json"))
+sys.exit(0 if jsonschema.Draft202012Validator(s).is_valid(json.load(open(sys.argv[1]))) else 1)
+PY
+  }
+  # Fixtures: validator and schema must give the same verdict. The file-name rule
+  # (name == basename) is outside the schema, so compare only on content-level fixtures.
+  for g in good-git-github good-about; do
+    if sv "$f/$g.json"; then ok "schema accepts $g"; else no "schema accepts $g"; fi
+  done
+  for b in bad-http-repo bad-commit bad-sha256 bad-both-sources bad-no-source bad-extra-field bad-no-grant bad-license bad-reserved default bad-host-codeberg bad-owner-github bad-ip-host bad-localhost bad-port bad-subdir bad-archive-source; do
+    if sv "$f/$b.json"; then no "schema rejects $b"; else ok "schema rejects $b"; fi
+  done
+  smut() { # <label> <accept|reject> <jq filter>
+    jq "$3" "$f/good-git-github.json" > "$tmp/s.json"
+    if sv "$tmp/s.json"; then [ "$2" = accept ] && ok "schema: $1" || no "schema: $1"
+    else [ "$2" = reject ] && ok "schema: $1" || no "schema: $1"; fi
+  }
+  smut "tier field" reject '. + {tier: "first-party"}'
+  smut "archive field" reject '. + {archive: "https://example.com/x.zip"}'
+  smut "sha256 field" reject '. + {sha256: ("a" * 64)}'
+  smut "subdir traversal" reject '. + {subdir: "../x"}'
+  smut "subdir mid traversal" reject '. + {subdir: "a/../x"}'
+  smut "absolute subdir" reject '. + {subdir: "/abs"}'
+  smut "nested subdir" accept '. + {subdir: "kits/community"}'
+  smut "no subdir" accept 'del(.subdir)'
+  smut "dotted subdir name" accept '. + {subdir: "a..b/x"}'
+  smut "first-party github repo" accept '.repo = "https://github.com/Zen-Labs-Corp/a"'
+  smut "other public repo host" reject '.repo = "https://example.com/a/b"'
+  smut "other github owner" reject '.repo = "https://github.com/acme/community"'
+  smut "look-alike owner" reject '.repo = "https://github.com/Zen-Labs-Corp-evil/community"'
+  smut "uppercase owner" accept ".repo = \"https://github.com/${zl^^}/community\""
+  smut "bad license" reject '.license = "WTFPL"'
+  smut "61-char title" reject '. + {title: ("x" * 61)}'
+  smut "25 CJK title" accept '. + {title: ("\u65e5" * 25)}'
+  smut "about and features" accept '. + {about: "First paragraph.\nSecond paragraph.", features: ["Fast", "Tiny"]}'
+  smut "1500-character about" accept '. + {about: ([range(1500)|"x"]|join(""))}'
+  smut "8 features" accept '. + {features: [range(8)|"item \(.)"]}'
+  for c in '. + {about: ([range(1501)|"x"]|join(""))}' '. + {about: "a <b> c"}' '. + {about: "a\tb"}' '. + {about: ""}' '. + {about: 5}' \
+    '. + {features: [range(9)|"item \(.)"]}' '. + {features: [([range(121)|"x"]|join(""))]}' '. + {features: ["a", 5]}' '. + {features: []}' '. + {features: ["a\nb"]}' '. + {features: ["<b>"]}' '. + {features: "a"}'; do
+    smut "about/features: $c" reject "$c"
+  done
+elif [ "${SCHEMA_TESTS_ALLOW_SKIP:-}" = 1 ]; then
+  echo "skip schema tests: python3 jsonschema not found (SCHEMA_TESTS_ALLOW_SKIP=1)"
+else
+  no "schema tests need python3 jsonschema==4.23.0 (set SCHEMA_TESTS_ALLOW_SKIP=1 to skip)"
+fi
 
 echo "$pass passed, $failed failed"
 [ "$failed" -eq 0 ]
