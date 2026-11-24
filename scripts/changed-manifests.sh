@@ -3,7 +3,7 @@
 # Usage: changed-manifests.sh [<before> <after>]
 # With two commits: manifests added or modified between them. Renames are turned
 # into delete + add (--no-renames) so a renamed manifest is mirrored. Without
-# arguments: every tracked manifest. Theme, schema and nested files are skipped.
+# arguments: every tracked manifest. Theme, kit, schema and nested files are skipped.
 set -euo pipefail
 if [ $# -eq 2 ]; then
   git diff --no-renames -z --name-only --diff-filter=AM "$1" "$2" -- 'manifests/*.json'
