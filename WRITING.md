@@ -210,7 +210,7 @@ they grant.
 rm -rf build
 GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o build/plugin.wasm .
 cp plugin.json build/plugin.json
-for d in migrations ui assets; do if [ -d "$d" ]; then cp -r "$d" "build/$d"; fi; done
+for d in assets layouts migrations partials schemas sections tags ui widgets; do if [ -d "$d" ]; then cp -r "$d" "build/$d"; fi; done
 ```
 
 `build/` is exactly what gets packed. This is also the recipe the registry
