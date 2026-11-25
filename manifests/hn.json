@@ -1,7 +1,7 @@
 {
   "name": "hn",
   "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
-  "commit": "f78bbb42a97cf5c4b422e00a0c2e2a79264f5690",
+  "commit": "8ad5374b8fd02dbc7a20d780c72d40d861c69b3b",
   "subdir": "plugins/hn",
   "title": "Hacker News style community",
   "about": "A link and discussion community built on the site comments. Members pick a username, submit links or text posts, vote, and discuss them in ranked threads.\nFront page, newest, ask, show, jobs, best, past and per-site lists, with gravity ranking that updates every minute. Karma unlocks flagging, vouching and downvotes at thresholds you set.\nModeration page for the owner: flagged items, bans by user, network or domain, and a log of every action. Flagged comments turn dead and stay hidden unless a member turns on showdead.\nFavorites, hidden stories, search, RSS feeds and a read-only JSON API are included. Everything works without JavaScript.\nPair it with the hn-classic theme, or apply the hn kit to set up pages, menus and comment settings in one step.",
@@ -12,10 +12,11 @@
     "Flags, vouches, bans and a moderation page",
     "Favorites, hide, search and showdead",
     "RSS feeds and a read-only JSON API",
+    "Username and password accounts, email optional",
     "Works without JavaScript"
   ],
   "license": "Apache-2.0",
-  "sdk": "^0.27",
+  "sdk": "^0.29",
   "archive_grant": true,
   "tier": "first-party"
 }
