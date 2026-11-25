@@ -1,10 +1,10 @@
 {
   "name": "hn",
   "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
-  "commit": "1b35a06e0ce49ba527954ca448bb58e2b9ded53a",
+  "commit": "88cf5529e31d42e3068a20b4b58cd71a830c5cfe",
   "subdir": "plugins/hn",
   "title": "Hacker News style community",
-  "about": "A link and discussion community built on the site comments. Members pick a username, submit links or text posts, vote, and discuss them in ranked threads.\nFront page, newest, ask, show, jobs, best, past and per-site lists, with gravity ranking that updates every minute. Karma unlocks flagging, vouching and downvotes at thresholds you set.\nModeration page for the owner: flagged items, bans by user, network or domain, and a log of every action. Flagged comments turn dead and stay hidden unless a member turns on showdead.\nFavorites, hidden stories, search, RSS feeds and a read-only JSON API are included. Everything works without JavaScript; with the site scripts grant, votes happen without a reload.\nPair it with the hn-classic theme, or apply the hn kit to set up pages, menus and comment settings in one step.",
+  "about": "A link and discussion community built on the site comments. Members pick a username, submit links or text posts, vote, and discuss them in ranked threads.\nFront page, newest, ask, show, jobs, best, past and per-site lists, with gravity ranking that updates every minute. Karma unlocks flagging, vouching and downvotes at thresholds you set.\nModeration page for the owner: flagged items, bans by user, network or domain, and a log of every action. Flagged comments turn dead and stay hidden unless a member turns on showdead.\nFavorites, hidden stories, search, RSS feeds and a read-only JSON API are included. Everything works without JavaScript.\nPair it with the hn-classic theme, or apply the hn kit to set up pages, menus and comment settings in one step.",
   "features": [
     "Story submission with duplicate link check",
     "Votes, karma and gravity ranked front page",
