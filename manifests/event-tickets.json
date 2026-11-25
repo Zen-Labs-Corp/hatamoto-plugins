@@ -1,7 +1,7 @@
 {
   "name": "event-tickets",
   "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
-  "commit": "923384680100298966562e9bc0fcc3ed5c9e8107",
+  "commit": "f5ba598332d57c02a2fd8b0b09b8441234c7205f",
   "subdir": "plugins/event-tickets",
   "title": "Event tickets",
   "license": "Apache-2.0",
