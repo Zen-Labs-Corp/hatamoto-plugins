@@ -1,22 +1,22 @@
 {
   "name": "event-calendar",
   "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
-  "commit": "37cd6d3496a4d7676d1eebc8009e88c2ee4e9ee1",
+  "commit": "38bf765fc9d50c21f10c46946ca4974158760b68",
   "subdir": "plugins/event-calendar",
   "title": "Event calendar",
-  "about": "Adds events to your site: event lists and calendar views for the page builder, a details card with add-to-calendar links, calendar feeds visitors can subscribe to, and Event structured data for search engines.\nSetup: installing creates the Calendar event, Venue, Organizer, Series and Category content types, so there is nothing to paste. An older event type from version 0.1 keeps working. Each event needs a start time, and only published events are used. Add the widgets you want in the page builder.\nWidgets: Event details, a calendar with list, month, week, day, photo, summary and map views, a mini calendar, an event countdown, a featured venue and a map of venues. Events can repeat daily, weekly, monthly or yearly, and single dates can be skipped or changed. Venues, organizers and series get their own pages.\nMaps use OpenStreetMap and are off by default. Turning them on looks up venue addresses and loads map tiles in the visitor's browser.\nVisitors can send in events through a form. Submissions are off by default, are checked for spam, and the owner approves each one. You can also import an iCal URL by hand with Import now; imported events are staged for your review. There are no scheduled imports yet.\nThe time_zone setting defaults to UTC, so set it to your site's zone, for example Europe/London.\nLimits: at most 100 events per import, no tickets or payments (only a ticket link), and the feed is cached for 15 minutes.",
+  "about": "Adds events to your site: event lists and calendar views for the page builder, a details card with add-to-calendar links, calendar feeds visitors can subscribe to, and Event structured data for search engines.\nSetup: installing creates the Calendar event, Venue, Organizer, Series and Category content types, so there is nothing to paste. An older event type from version 0.1 keeps working. Each event needs a start time, and only published events are used. Needs a Hatamoto core with plugin SDK 0.28.1 or later.\nWidgets: Event details, a calendar with list, month, week, day, photo, summary and map views, a mini calendar, an event countdown, a featured venue and a map of venues. The calendar filters by tag and by fields you opt in. Events can repeat daily, weekly, monthly or yearly, and the Repeating tab has Skip, Change time and Restore buttons for single dates.\nMaps use OpenStreetMap and are off by default. Turning them on looks up venue addresses and loads map tiles in the visitor's browser.\nImports: Google, Outlook, Meetup and iCal calendars, and Eventbrite organizations by API token. Sources set to daily are read twice a day and publish new events on their own once the owner approves the standing rule, at most 100 new events per run and 200 a day. Run now imports are drafts for your review. Visitors can also send in events through a form, off by default.\nSet time_zone to your site's zone, for example Europe/London. No tickets or payments, only a ticket link.",
   "features": [
     "Calendar widget with list, month, week, day, photo, summary and map views",
     "Event details card with Google, Outlook, Yahoo and iCal links",
-    "Recurring events with per-date skip and change",
-    "Venue, organizer and series pages",
-    "Mini calendar, countdown and featured venue widgets",
-    "OpenStreetMap maps, off by default",
-    "Public event submissions, spam-checked and approved by the owner",
-    "Manual iCal import with Import now, staged for review"
+    "Recurring events with Skip, Change time and Restore buttons",
+    "Tag and custom-field filters, with fields the owner opts in",
+    "Venue, organizer and series pages, mini calendar and countdown",
+    "Scheduled imports twice a day, published after the owner approves the rule",
+    "Eventbrite organization import by API token, past the old 100-event limit",
+    "Public event submissions and Run now imports, both reviewed by the owner"
   ],
   "license": "Apache-2.0",
-  "sdk": "^0.22",
+  "sdk": "^0.28.1",
   "archive_grant": true,
   "tier": "first-party"
 }
