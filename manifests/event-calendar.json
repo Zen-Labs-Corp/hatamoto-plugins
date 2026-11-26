@@ -1,19 +1,19 @@
 {
   "name": "event-calendar",
   "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
-  "commit": "38bf765fc9d50c21f10c46946ca4974158760b68",
+  "commit": "39e2f0a91db7cca8d6ce8f8fab11bea7a6c3fee8",
   "subdir": "plugins/event-calendar",
   "title": "Event calendar",
-  "about": "Adds events to your site: event lists and calendar views for the page builder, a details card with add-to-calendar links, calendar feeds visitors can subscribe to, and Event structured data for search engines.\nSetup: installing creates the Calendar event, Venue, Organizer, Series and Category content types, so there is nothing to paste. An older event type from version 0.1 keeps working. Each event needs a start time, and only published events are used. Needs a Hatamoto core with plugin SDK 0.28.1 or later.\nWidgets: Event details, a calendar with list, month, week, day, photo, summary and map views, a mini calendar, an event countdown, a featured venue and a map of venues. The calendar filters by tag and by fields you opt in. Events can repeat daily, weekly, monthly or yearly, and the Repeating tab has Skip, Change time and Restore buttons for single dates.\nMaps use OpenStreetMap and are off by default. Turning them on looks up venue addresses and loads map tiles in the visitor's browser.\nImports: Google, Outlook, Meetup and iCal calendars, and Eventbrite organizations by API token. Sources set to daily are read twice a day and publish new events on their own once the owner approves the standing rule, at most 100 new events per run and 200 a day. Run now imports are drafts for your review. Visitors can also send in events through a form, off by default.\nSet time_zone to your site's zone, for example Europe/London. No tickets or payments, only a ticket link.",
+  "about": "Adds events to your site: event lists and calendar views, a details card with add-to-calendar links, calendar feeds visitors can subscribe to, and Event structured data for search engines.\nSetup: installing creates the Calendar event, Venue, Organizer, Series and Category content types, so there is nothing to paste. Each event needs a start time, and only published events are used. Needs plugin SDK 0.28.1 or later.\nWidgets: Event details, a calendar with several views, a mini calendar, an event countdown, a featured venue and a map of venues. Events can repeat, and the Repeating tab has Skip, Change time and Restore buttons for single dates.\nVenue, organizer and series pages are styled and show upcoming dates; a series page also summarizes skipped and changed dates. Organizer email and phone stay hidden unless the owner turns on Show contact.\nEvents can show a YouTube or Vimeo video that plays on click, or a Zoom button. The join link can be kept for ticket holders only.\nMaps use OpenStreetMap and are off by default. Turning them on looks up venue addresses and loads map tiles in the visitor's browser.\nImports: Google, Outlook, Meetup and iCal calendars, and Eventbrite by API token. Daily sources publish new events once the owner approves the standing rule, at most 100 per run and 200 a day. Run now imports are drafts. A visitor event form is off by default.\nSet time_zone to your site's zone, for example Europe/London. No tickets or payments, only a ticket link.",
   "features": [
     "Calendar widget with list, month, week, day, photo, summary and map views",
     "Event details card with Google, Outlook, Yahoo and iCal links",
     "Recurring events with Skip, Change time and Restore buttons",
     "Tag and custom-field filters, with fields the owner opts in",
-    "Venue, organizer and series pages, mini calendar and countdown",
-    "Scheduled imports twice a day, published after the owner approves the rule",
-    "Eventbrite organization import by API token, past the old 100-event limit",
-    "Public event submissions and Run now imports, both reviewed by the owner"
+    "Styled venue, organizer and series pages with upcoming dates and a series summary",
+    "Organizer email and phone hidden unless the owner turns on Show contact",
+    "YouTube or Vimeo video (click to play) or a Zoom button, join link for ticket holders only",
+    "Scheduled and Eventbrite imports, plus public submissions, all reviewed by the owner"
   ],
   "license": "Apache-2.0",
   "sdk": "^0.28.1",
