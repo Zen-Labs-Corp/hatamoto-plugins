@@ -22,6 +22,6 @@
   },
   "allOf": [
     { "not": { "required": ["author"] } },
-    { "not": { "required": ["name"], "properties": { "name": { "enum": ["webhooks", "hello"] } } } }
+    { "not": { "required": ["name"], "properties": { "name": { "enum": ["webhooks", "hello", "gtm", "google-analytics"] } } } }
   ]
 }

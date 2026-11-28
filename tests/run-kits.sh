@@ -81,6 +81,7 @@ mutate "internal suffix" '.repo = "https://git.corp/tanaka/community"' "public h
 mutate "single label host" '.repo = "https://intranet/tanaka/community"' "public host name"
 mutate "ipv6 host" '.repo = "https://[::1]/tanaka/community"' "public host name"
 mutate "gtm name" '.name = "gtm"' "is reserved"
+mutate "google-analytics name" '.name = "google-analytics"' "is reserved"
 mutate "tier field" '. + {tier: "first-party"}' "unknown field(s): tier"
 mutate "numeric author" '.author = 5' "author must be a string"
 # The owner rule: only Zen-Labs-Corp / zenlabscorp on github.com, any case, nothing around it.

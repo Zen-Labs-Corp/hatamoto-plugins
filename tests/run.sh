@@ -58,7 +58,7 @@ elif [[ $err == *"must equal the file name"* ]]; then ok "name/file mismatch rej
 else no "name/file mismatch: $err"; fi
 
 # Reserved first-party names (community-shaped manifests, no tier).
-for r in gtm webhooks searchconsole hello; do
+for r in gtm webhooks searchconsole hello google-analytics; do
   jq --arg n "$r" ".name = \$n | $com" "$f/good.json" > "$tmp/$r.json"
   if err=$("$v" "$tmp/$r.json" 2>&1 >/dev/null); then no "reserved name $r rejected"
   elif [[ $err == *"reserved for a first-party plugin"* ]]; then ok "reserved name $r rejected"
@@ -67,19 +67,19 @@ done
 
 # First-party tier. fp <name> <owner> writes a manifest without author.
 fp() { jq --arg n "$1" --arg r "https://github.com/$2/hatamoto-plugin-$1" '.name = $n | .repo = $r | .tier = "first-party" | del(.author)' "$f/good.json" > "$tmp/$1.json"; }
-for n in gtm searchconsole; do
+for n in searchconsole; do
   fp "$n" zenlabscorp
   if "$v" "$tmp/$n.json" >/dev/null 2>&1; then ok "first-party $n accepted"; else no "first-party $n accepted"; fi
 done
-fp gtm ZenLabsCorp
-if "$v" "$tmp/gtm.json" >/dev/null 2>&1; then ok "first-party owner ZenLabsCorp accepted"; else no "first-party owner ZenLabsCorp accepted"; fi
-fp gtm Zen-Labs-Corp
-if "$v" "$tmp/gtm.json" >/dev/null 2>&1; then ok "first-party owner Zen-Labs-Corp accepted"; else no "first-party owner Zen-Labs-Corp accepted"; fi
+fp searchconsole ZenLabsCorp
+if "$v" "$tmp/searchconsole.json" >/dev/null 2>&1; then ok "first-party owner ZenLabsCorp accepted"; else no "first-party owner ZenLabsCorp accepted"; fi
+fp searchconsole Zen-Labs-Corp
+if "$v" "$tmp/searchconsole.json" >/dev/null 2>&1; then ok "first-party owner Zen-Labs-Corp accepted"; else no "first-party owner Zen-Labs-Corp accepted"; fi
 fp acme-seo zenlabscorp
 if "$v" "$tmp/acme-seo.json" >/dev/null 2>&1; then ok "first-party non-reserved name accepted"; else no "first-party non-reserved name accepted"; fi
 # The first-party monorepo: owner Zen-Labs-Corp, one plugin per subdir.
-jq --arg n gtm '.name = $n | .repo = "https://github.com/Zen-Labs-Corp/hatamoto-first-party" | .subdir = "plugins/gtm" | .tier = "first-party" | del(.author)' "$f/good.json" > "$tmp/gtm.json"
-if "$v" "$tmp/gtm.json" >/dev/null 2>&1; then ok "first-party owner Zen-Labs-Corp with subdir accepted"; else no "first-party owner Zen-Labs-Corp with subdir accepted"; fi
+jq --arg n searchconsole '.name = $n | .repo = "https://github.com/Zen-Labs-Corp/hatamoto-first-party" | .subdir = "plugins/searchconsole" | .tier = "first-party" | del(.author)' "$f/good.json" > "$tmp/searchconsole.json"
+if "$v" "$tmp/searchconsole.json" >/dev/null 2>&1; then ok "first-party owner Zen-Labs-Corp with subdir accepted"; else no "first-party owner Zen-Labs-Corp with subdir accepted"; fi
 # reject_fp <label> <want> <name> <jq filter over the first-party manifest> [owner]
 reject_fp() {
   local label=$1 want=$2 n=$3 filter=$4 owner=${5:-zenlabscorp} err
@@ -89,25 +89,30 @@ reject_fp() {
   elif [[ $err == *"$want"* ]]; then ok "$label rejected"
   else no "$label: $err"; fi
 }
-reject_fp "gtm first-party from acme" "tier first-party requires" gtm . acme
 reject_fp "searchconsole first-party from acme" "tier first-party requires" searchconsole . acme
 reject_fp "non-reserved first-party from acme" "tier first-party requires" acme-seo . acme
-reject_fp "gtm from zenlabscorp without tier" "reserved for a first-party plugin" gtm 'del(.tier) | .author = "zenlabscorp"'
 reject_fp "searchconsole from zenlabscorp without tier" "reserved for a first-party plugin" searchconsole 'del(.tier) | .author = "zenlabscorp"'
-reject_fp "tier with author" "author must be absent" gtm '.author = "zenlabscorp"'
-reject_fp "tier community" "tier must be" gtm '.tier = "community"'
+reject_fp "tier with author" "author must be absent" searchconsole '.author = "zenlabscorp"'
+reject_fp "tier community" "tier must be" searchconsole '.tier = "community"'
 reject_fp "tier junk" "tier must be" acme-seo '.tier = "x"'
 reject_fp "tier non-string" "tier must be a string" acme-seo '.tier = true'
 reject_fp "webhooks first-party from zenlabscorp" "reserved for a first-party plugin" webhooks .
 reject_fp "hello first-party from zenlabscorp" "reserved for a first-party plugin" hello .
 for o in zenlabscorp-evil zenlabscorpx zenlabscorp.evil xzenlabscorp zen-labs-corp-evil zen-labs-corpx xzen-labs-corp; do
-  reject_fp "look-alike owner $o" "tier first-party requires" gtm . "$o"
+  reject_fp "look-alike owner $o" "tier first-party requires" searchconsole . "$o"
 done
 # tier on an acme-owned manifest with an author is refused too.
 jq "$com | . + {\"tier\": \"first-party\"}" "$f/good.json" > "$tmp/good.json"
 if "$v" "$tmp/good.json" >/dev/null 2>&1; then no "community manifest with tier rejected"; else ok "community manifest with tier rejected"; fi
 # A manifest without a tier is refused and points outside authors to the developer portal.
 dev=https://hatamoto.dev/developers
+for r in gtm google-analytics; do
+  for o in zenlabscorp ZenLabsCorp Zen-Labs-Corp; do
+    reject_fp "$r never accepted from $o" "reserved for a first-party plugin" "$r" . "$o"
+  done
+  reject_fp "$r never accepted in the monorepo" "reserved for a first-party plugin" "$r" \
+    ".repo = \"https://github.com/Zen-Labs-Corp/hatamoto-first-party\" | .subdir = \"plugins/$r\""
+done
 reject_fp "missing tier" "missing required field: tier (outside authors publish at $dev)" acme-seo 'del(.tier)'
 reject_fp "community-style manifest" "$dev" acme-seo "$com" acme
 reject_fp "tier community names the portal" "$dev" acme-seo '.tier = "community"'
@@ -124,7 +129,7 @@ if [[ $(rules_err "$tmp/google-sync.json") == *"must not start with the brand"* 
 # Look-alike names against sibling manifests (themes included) and reserved names.
 mkdir -p "$tmp/lk/themes"
 jq ".name = \"acme-sync\" | $com" "$f/good.json" > "$tmp/lk/acme-sync.json"
-jq '.name = "gtm" | .repo = "https://github.com/Zen-Labs-Corp/x"' "$f/good.json" > "$tmp/lk/gtm.json"
+jq '.name = "searchconsole" | .repo = "https://github.com/Zen-Labs-Corp/x"' "$f/good.json" > "$tmp/lk/searchconsole.json"
 echo '{}' > "$tmp/lk/themes/sumi-ink.json"
 lk() { # lk <accept|reject> <name> [want]: a rejection must print the want substring.
   local err
@@ -135,7 +140,7 @@ lk() { # lk <accept|reject> <name> [want]: a rejection must print the want subst
   elif [[ $err == *"${3:-}"* ]]; then ok "look-alike: rejects $2"
   else no "look-alike: rejects $2: $err"; fi
 }
-if "$v" "$tmp/lk/gtm.json" >/dev/null 2>&1; then ok "look-alike: an existing manifest is not its own look-alike"; else no "look-alike: self"; fi
+if "$v" "$tmp/lk/searchconsole.json" >/dev/null 2>&1; then ok "look-alike: an existing manifest is not its own look-alike"; else no "look-alike: self"; fi
 lk accept acme-other
 lk reject gtn 'looks like "gtm"'
 lk reject acme-synk 'looks like "acme-sync"'
@@ -194,24 +199,24 @@ PY
     else [ "$1" = reject ] && ok "schema: $2" || no "schema: $2"; fi
   }
   sc accept "good.json" "$f/good.json"
-  fp gtm zenlabscorp; sc accept "first-party gtm" "$tmp/gtm.json"
-  fp gtm ZenLabsCorp; sc accept "first-party ZenLabsCorp" "$tmp/gtm.json"
-  fp gtm Zen-Labs-Corp; sc accept "first-party Zen-Labs-Corp" "$tmp/gtm.json"
-  fp gtm zen-labs-corp; sc accept "first-party zen-labs-corp" "$tmp/gtm.json"
-  for o in zen-labs-corp-evil zen-labs-corpx zen-labs.corp xzen-labs-corp; do fp gtm "$o"; sc reject "look-alike $o" "$tmp/gtm.json"; done
+  fp searchconsole zenlabscorp; sc accept "first-party searchconsole" "$tmp/searchconsole.json"
+  fp searchconsole ZenLabsCorp; sc accept "first-party ZenLabsCorp" "$tmp/searchconsole.json"
+  fp searchconsole Zen-Labs-Corp; sc accept "first-party Zen-Labs-Corp" "$tmp/searchconsole.json"
+  fp searchconsole zen-labs-corp; sc accept "first-party zen-labs-corp" "$tmp/searchconsole.json"
+  for o in zen-labs-corp-evil zen-labs-corpx zen-labs.corp xzen-labs-corp; do fp searchconsole "$o"; sc reject "look-alike $o" "$tmp/searchconsole.json"; done
   jq --arg t "$(printf 'x%.0s' $(seq 40))" '.title = $t' "$f/good.json" > "$tmp/x.json"; sc accept "40-character title" "$tmp/x.json"
   jq --arg t "$(printf 'x%.0s' $(seq 41))" '.title = $t' "$f/good.json" > "$tmp/x.json"; sc reject "41-character title" "$tmp/x.json"
-  fp gtm acme; sc reject "first-party from acme" "$tmp/gtm.json"
-  for o in zenlabscorp-evil zenlabscorpx zenlabscorp.evil; do fp gtm "$o"; sc reject "look-alike $o" "$tmp/gtm.json"; done
-  fp gtm zenlabscorp; jq '.author = "zenlabscorp"' "$tmp/gtm.json" > "$tmp/x.json"; sc reject "tier with author" "$tmp/x.json"
-  jq '.tier = "community"' "$tmp/gtm.json" > "$tmp/x.json"; sc reject "tier community" "$tmp/x.json"
+  fp searchconsole acme; sc reject "first-party from acme" "$tmp/searchconsole.json"
+  for o in zenlabscorp-evil zenlabscorpx zenlabscorp.evil; do fp searchconsole "$o"; sc reject "look-alike $o" "$tmp/searchconsole.json"; done
+  fp searchconsole zenlabscorp; jq '.author = "zenlabscorp"' "$tmp/searchconsole.json" > "$tmp/x.json"; sc reject "tier with author" "$tmp/x.json"
+  jq '.tier = "community"' "$tmp/searchconsole.json" > "$tmp/x.json"; sc reject "tier community" "$tmp/x.json"
   jq 'del(.tier)' "$f/good.json" > "$tmp/x.json"; sc reject "no tier" "$tmp/x.json"
   jq "$com" "$f/good.json" > "$tmp/x.json"; sc reject "community-style manifest" "$tmp/x.json"
   jq ".tier = \"x\" | .author = \"acme\"" "$f/good.json" > "$tmp/x.json"; sc reject "tier junk with author" "$tmp/x.json"
-  for r in webhooks hello gtm searchconsole; do
+  for r in webhooks hello gtm searchconsole google-analytics; do
     jq --arg n "$r" ".name = \$n | $com" "$f/good.json" > "$tmp/x.json"; sc reject "community reserved name $r" "$tmp/x.json"
   done
-  for r in webhooks hello; do fp "$r" zenlabscorp; sc reject "first-party reserved name $r" "$tmp/$r.json"; done
+  for r in webhooks hello gtm google-analytics; do fp "$r" zenlabscorp; sc reject "first-party reserved name $r" "$tmp/$r.json"; done
   fp searchconsole zenlabscorp; sc accept "first-party searchconsole" "$tmp/searchconsole.json"
   fp searchconsole acme; sc reject "first-party searchconsole from acme" "$tmp/searchconsole.json"
   abfile '.about = "First paragraph.\nSecond paragraph." | .features = ["Fast", "Tiny"]'; sc accept "about and features" "$tmp/ab/good.json"
@@ -242,12 +247,12 @@ for l in WTFPL Proprietary "" mit "MIT OR Apache-2.0" AGPL-1.0; do
 done
 
 # title: a display name, 1 to 40 characters, one script, no symbols; community titles share a word with the name.
-# tt <accept|reject> <title> [first-party] [want] [name]: good.json (or a first-party gtm) with that
+# tt <accept|reject> <title> [first-party] [want] [name]: good.json (or a first-party searchconsole) with that
 # title, and the name when given. A rejection must print the want substring.
 tt() {
   local m=${5:-good} err
   mkdir -p "$tmp/tt"
-  if [ -n "${3:-}" ]; then m=gtm; fp gtm zenlabscorp; jq --arg t "$2" '.title = $t' "$tmp/gtm.json" > "$tmp/tt/gtm.json"
+  if [ -n "${3:-}" ]; then m=searchconsole; fp searchconsole zenlabscorp; jq --arg t "$2" '.title = $t' "$tmp/searchconsole.json" > "$tmp/tt/searchconsole.json"
   else jq --arg t "$2" --arg n "$m" ".title = \$t | .name = \$n | $com" "$f/good.json" > "$tmp/tt/$m.json"; fi
   if [ -n "${3:-}" ]; then err=$("$v" "$tmp/tt/$m.json" 2>&1 >/dev/null) || true; else err=$(rules_err "$tmp/tt/$m.json"); fi
   if [ -z "$err" ]; then [ "$1" = accept ] && ok "title accepted: $2" || no "title accepted: $2"

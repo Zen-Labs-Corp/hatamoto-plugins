@@ -77,6 +77,7 @@ mutate "internal suffix" '.repo = "https://git.corp/tanaka/kumo"' "public host n
 mutate "single label host" '.repo = "https://intranet/tanaka/kumo"' "public host name"
 mutate "ipv6 host" '.repo = "https://[::1]/tanaka/kumo"' "public host name"
 mutate "gtm name" '.name = "gtm"' "is reserved"
+mutate "google-analytics name" '.name = "google-analytics"' "is reserved"
 # The owner rule: only Zen-Labs-Corp / zenlabscorp on github.com, any case, nothing around it.
 mutate "other github owner" '.repo = "https://github.com/acme/kumo"' "outside authors publish at $dev"
 mutate "other public host" '.repo = "https://example.com/Zen-Labs-Corp/kumo"' "outside authors publish at $dev"
