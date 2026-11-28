@@ -272,13 +272,13 @@ fi
 fpx=0
 if has tier && [ "$tier" = "first-party" ] && [ "$owner_ok" -eq 1 ]; then fpx=1; fi
 
-# Reserved names. gtm and searchconsole are first-party only; webhooks and hello
-# are never accepted. Keep in sync with the registry build script.
+# Reserved names. searchconsole is first-party only; webhooks, hello, gtm and
+# google-analytics are never accepted. Keep in sync with the registry build script.
 reserved_flagged=0
-for reserved in webhooks hello; do
+for reserved in webhooks hello gtm google-analytics; do
   if [ "$name" = "$reserved" ]; then bad "name \"$name\" is reserved for a first-party plugin"; reserved_flagged=1; fi
 done
-for reserved in gtm searchconsole; do
+for reserved in searchconsole; do
   if [ "$name" = "$reserved" ] && { [ "$tier" != "first-party" ] || [ "$owner_ok" -ne 1 ]; }; then
     bad "name \"$name\" is reserved for a first-party plugin"; reserved_flagged=1
   fi
