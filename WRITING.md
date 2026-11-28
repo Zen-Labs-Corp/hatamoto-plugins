@@ -54,8 +54,8 @@ any range. The compatibility promises are in [STABILITY.md](https://github.com/Z
 
 ## 2. Lay out the files
 
-Copy the split used by the first-party `gtm` plugin
-(<https://github.com/Zen-Labs-Corp/hatamoto-first-party/tree/main/plugins/gtm>). It keeps the code that only
+Copy the split used by the first-party `searchconsole` plugin
+(<https://github.com/Zen-Labs-Corp/hatamoto-first-party/tree/main/plugins/searchconsole>). It keeps the code that only
 makes sense inside WebAssembly apart from the code you can unit test on your
 machine:
 

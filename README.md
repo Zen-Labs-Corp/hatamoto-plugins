@@ -45,7 +45,7 @@ Run the same checks locally:
 bash tests/run.sh                         # validator self-test (includes run-themes.sh and run-kits.sh)
 bash tests/run-themes.sh                  # theme validator self-test only
 bash tests/run-kits.sh                    # kit validator self-test only
-scripts/validate-manifest.sh manifests/gtm.json --remote
+scripts/validate-manifest.sh manifests/searchconsole.json --remote
 scripts/validate-theme-manifest.sh manifests/themes/hanshi.json --remote
 scripts/validate-kit-manifest.sh manifests/kits/<name>.json --remote
 ```

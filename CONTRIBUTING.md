@@ -29,15 +29,15 @@ belongs to the project. A manifest that points at another repo is mirrored to
 ## The manifest
 
 Add `manifests/<name>.json`, where `<name>` is the `name` in the plugin's `plugin.json`.
-This is the shape of a real entry (see `manifests/gtm.json`):
+This is the shape of a real entry (see `manifests/searchconsole.json`):
 
 ```json
 {
-  "name": "gtm",
+  "name": "searchconsole",
   "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
   "commit": "077051fd84adad2277990b25e8a8fdee3c4c6a50",
-  "subdir": "plugins/gtm",
-  "title": "Google Tag Manager",
+  "subdir": "plugins/searchconsole",
+  "title": "Google Search Console",
   "license": "Apache-2.0",
   "sdk": "^0.8",
   "archive_grant": true,
@@ -65,7 +65,7 @@ No other keys are allowed. See [manifests/schema.json](manifests/schema.json).
 Check the file before you push:
 
 ```sh
-scripts/validate-manifest.sh manifests/gtm.json --remote
+scripts/validate-manifest.sh manifests/searchconsole.json --remote
 ```
 
 `--remote` also fetches the repo and confirms the commit exists and that `plugin.json`
@@ -84,8 +84,8 @@ CI rejects a manifest that breaks these rules. The word lists are plain text in
   https://hatamoto.dev/developers.
 - **Name.** No part of the name (split at `-`) may be a banned word from
   [policy/banned-tokens.txt](policy/banned-tokens.txt), such as `beta`, `dev` or `plugin`.
-  `webhooks` and `hello` are never accepted; `gtm` and `searchconsole` are accepted
-  here and nowhere else. The name may not look like another listing, plugin or theme
+  `webhooks`, `hello`, `gtm` and `google-analytics` are never accepted; `searchconsole` is
+  accepted here and nowhere else. The name may not look like another listing, plugin or theme
   (one character apart, or equal once `-` is removed and `0 1 3 5` are read as
   `o l e s`), and a plugin and a theme cannot share a name (a kit may share a name with a plugin or a
   theme). First-party listings are

@@ -11,11 +11,11 @@ with their own format and checks. Kits live in [kits/](kits/README.md), one
 
 ```json
 {
-  "name": "gtm",
+  "name": "searchconsole",
   "repo": "https://github.com/Zen-Labs-Corp/hatamoto-first-party",
   "commit": "077051fd84adad2277990b25e8a8fdee3c4c6a50",
-  "subdir": "plugins/gtm",
-  "title": "Google Tag Manager",
+  "subdir": "plugins/searchconsole",
+  "title": "Google Search Console",
   "license": "Apache-2.0",
   "sdk": "^0.8",
   "archive_grant": true,
@@ -38,8 +38,8 @@ with their own format and checks. Kits live in [kits/](kits/README.md), one
 | `features` | no | short bullet list for the plugin page; same rules, see `about` |
 | `tier` | yes | must be `first-party`. The `repo` owner must be `Zen-Labs-Corp` or `zenlabscorp` and `author` must be absent. A missing or different tier is refused with a pointer to https://hatamoto.dev/developers |
 
-The names `gtm` and `searchconsole` are reserved for first-party manifests from
-`Zen-Labs-Corp` or `zenlabscorp`; `webhooks` and `hello` are reserved and never accepted.
+The name `searchconsole` is reserved for first-party manifests from
+`Zen-Labs-Corp` or `zenlabscorp`; `webhooks`, `hello`, `gtm` and `google-analytics` are reserved and never accepted.
 
 No other keys are allowed. The machine-readable rules are in
 [schema.json](schema.json); `scripts/validate-manifest.sh` enforces the same ones.
